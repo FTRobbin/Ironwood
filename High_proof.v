@@ -198,14 +198,14 @@ Proof.
     apply (HStep_keeps_agreement gs' gs'' H1 IHHSteps).
 Qed. 
 
-Theorem HinitGS_keeps_agreement : forall input n, agree (HinitGS (HInitP input n)).
+Theorem HinitGS_keeps_agreement : forall input n0, agree (HinitGS (HInitP input n0)).
 Proof.
   intros.
   unfold HinitGS.
   unfold agree.
   intros.
   simpl.
-  destruct (i <? n) ; destruct (j <? n) ; unfold agree' ; unfold HinitLS ; unfold Hextract_loc ; auto.
+  destruct (i <? n0) ; destruct (j <? n0) ; unfold agree' ; unfold HinitLS ; unfold Hextract_loc ; auto.
 Qed.
 
 Theorem HAgreement : forall params gs, HisValid params gs -> agree gs.

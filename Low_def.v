@@ -3,17 +3,19 @@
 Require Import Program Arith List.
 
 Load Quorum.
+Load Temporal.
 
 (* Model *)
 
-Record Message := MSG {m_round_no : nat; sender_id : nat; receiver_id : nat; vote : option bool}.
+Record Message := MSG {sender_id : nat; receiver_id : nat; m_round_no : nat; vote : option bool}.
 
 Record HonestNode := HLS {hl_round_no : nat; input : bool; estimation : nat -> option bool; history : nat -> nat -> option Message; decision : option bool}.
 
 Inductive LocalState :=
 | Honest (ls : HonestNode).
 
-Record GlobalState := GS {round_no : nat; n : nat; f : nat; CQ : n_CoQuorum; local_states : nat -> option LocalState; undelivered : list Message}.
+Record GlobalState := GS {round_no : nat; n : nat; f : nat; CQ : n_CoQuorum; local_states : nat -> option LocalState; 
+                          message_archive : nat -> nat -> nat -> option Message; delivered : nat -> nat -> nat -> bool}.
 
 (* Semantics *)
 
@@ -95,14 +97,11 @@ Definition step_message_from_to (ls : LocalState) (source : nat) (dest : nat) : 
     MSG r source dest (estimation ls' r)
   end.
 
-Definition step_message_from (n : nat) (lss : nat -> option LocalState) (source : nat) :=
-  match (lss source) with
-  | Some ls => map (step_message_from_to ls source) (seq 0 n)
-  | None => []
+Definition step_message (n : nat) (lss : nat -> option LocalState) : nat -> nat -> option Message :=
+  fun i j => match (lss i) with
+  | None => None
+  | Some ls => Some (step_message_from_to ls i j)
   end.
-
-Definition step_message (n : nat) (lss : nat -> option LocalState) : list Message :=
-  flat_map (step_message_from n lss)(seq 0 n).
 
 Definition step_deliver_loc (n : nat) (cq : n_CoQuorum) (ls : LocalState) (m : Message) : LocalState := 
   let rm := m_round_no m in
@@ -134,25 +133,57 @@ Definition step_deliver (n : nat) (cq : n_CoQuorum) (lss : nat -> option LocalSt
         end
     else lss i.
 
+Definition d1_map {A : Type} (n : nat) (m : nat -> nat -> A) : nat -> list A :=
+  fun i => map (m i) (seq 0 n).
+
+Definition d2_map {A : Type} (n : nat) (m : nat -> nat -> A) : list A :=
+  flat_map (d1_map n m) (seq 0 n).
+
+Fixpoint ext_first {A : Type} (l : list (option A)) (r : list bool) : option A :=
+  match (l, r) with
+  | (nil, _) => None
+  | (_, nil) => None
+  | (h :: t, h' :: t') =>
+    if (h') then h else ext_first t t'
+  end.
+
+Definition get_undelivered (n : nat) (msg : nat -> nat -> option Message) (d : nat -> nat -> bool) :=
+  let msg_list := d2_map n msg in
+  let flag_list := d2_map n d in
+  ext_first msg_list flag_list.
+
+Definition update_messages (r : nat) (msg : nat -> nat -> nat -> option Message) (nmsg : nat -> nat -> option Message) :=
+  fun r' i j => if (r' =? r) then (nmsg i j) else msg r' i j.
+
+Definition update_delivered (r : nat) (d : nat -> nat -> nat -> bool) (m : Message) :=
+  fun r' i' j' => match m with
+  | MSG i j _ _ => if (andb (andb (r' =? r) (i' =? i)) (j' =? j)) then true else (d r' i' j')
+  end.
+
 Definition step (gs : GlobalState) : GlobalState :=
   let r := round_no gs in
   let n := n gs in
   let f := f gs in
   let cq := CQ gs in
   let lss := local_states gs in
-  let msg := undelivered gs in
-    match msg with
-    | nil => let nlss := step_round n cq lss in 
-        GS (r + 1) n f cq nlss (step_message n nlss)
-    | m :: msg' => GS r n f cq (step_deliver n cq lss m) msg'
-    end.
+  let msgs := message_archive gs in
+  let d := delivered gs in
+  let m' := get_undelivered n (msgs r) (d r) in
+  match m' with
+  | None => let nlss := step_round n cq lss in
+            let nmsg := step_message n nlss in
+      GS (r + 1) n f cq nlss (update_messages r msgs nmsg) d
+  | Some m => GS r n f cq (step_deliver n cq lss m) msgs (update_delivered r d m)
+  end.
 
+(*
 Inductive Step : GlobalState -> GlobalState -> Prop :=
   | ONE : forall gs gs', (gs' = step gs) -> Step gs gs'.
 
 Inductive Steps : GlobalState -> GlobalState -> Prop :=
   | ZERO : forall gs gs', gs = gs' -> Steps gs gs'
   | MANY : forall gs gs' gs'', Steps gs gs' /\ Step gs' gs'' -> Steps gs gs''.
+*)
 
 (* Initial value & validity *)
 
@@ -168,10 +199,8 @@ Definition initGS (params : InitialParams) :=
   let f := numf params in 
   let cq := coq_cq params in
   let n := f_to_n f in
-  GS 0 n f cq (fun i => if (i <? n) then Some (initLS i (input i)) else None) [].
+  GS 0 n f cq (fun i => if (i <? n) then Some (initLS i (input i)) else None) (fun r i j => None) (fun r i j => false).
 
-Definition isValid (params : InitialParams) (gs : GlobalState) :=
-  n_CoQuorum_valid (coq_cq params) (f_to_n (numf params)) /\ Steps (initGS params) gs.
 
 (* TODO use monads to abstract the low-level semantics for later updates 
   With the non-deter monads, we can let the steps go non-deterly for advers
@@ -182,3 +211,65 @@ Definition isValid (params : InitialParams) (gs : GlobalState) :=
   or co-induction 
   forall f, Stream A f ...
 *)
+
+Inductive Low_leq : GlobalState -> GlobalState -> Prop :=
+| Zero : forall s, Low_leq s s
+| Many : forall s s', Low_leq s s' -> Low_leq s (step s').
+
+Instance LowState : @State GlobalState Low_leq step := {}.
+  constructor.
+  intro ; eapply (Many s s) ; constructor.
+  intros.
+  induction H0.
+  auto.
+  eapply (Many s s').
+  auto.
+Defined.
+
+Notation "A <<= B" := (Low_leq A B) (at level 80).
+
+Definition isValidP (params : InitialParams) :=
+  n_CoQuorum_valid (coq_cq params) (f_to_n (numf params)).
+
+Definition isValid (params : InitialParams) (gs : GlobalState) :=
+  isValidP params /\ (initGS params) <<= gs.
+
+(*
+Record HonestNode := HLS {hl_round_no : nat; input : bool; estimation : nat -> option bool; history : nat -> nat -> option Message; decision : option bool}.
+
+Record GlobalState := GS {round_no : nat; n : nat; f : nat; CQ : n_CoQuorum; local_states : nat -> option LocalState; 
+                          message_archive : nat -> nat -> nat -> option Message; delivered : nat -> nat -> nat -> bool}.
+*)
+
+Definition LowL_mono : LocalState -> LocalState -> Prop :=
+  fun lls lls' =>
+  match (lls, lls') with
+  | (Honest ls, Honest ls') => 
+    (hl_round_no ls) <= (hl_round_no ls') /\
+    (input ls) = (input ls') /\
+    (forall i b, ((estimation ls) i) = Some b -> ((estimation ls') i) = Some b) /\
+    (forall i j m, (history ls i j) = Some m -> (history ls' i j) = Some m) /\
+    (forall b, (decision ls) = Some b -> (decision ls') = Some b)
+  end.
+
+Definition Low_mono : GlobalState -> GlobalState -> Prop :=
+  fun gs gs' =>
+  (round_no gs) <= (round_no gs') /\
+  (n gs) = (n gs') /\
+  (f gs) = (f gs') /\
+  (CQ gs) = (CQ gs') /\
+  (forall i ls ls', ((local_states gs) i) = Some ls -> ((local_states gs') i = Some ls' /\ (LowL_mono ls ls'))) /\
+  (forall i j k m, (message_archive gs i j k) = Some m -> (message_archive gs' i j k) = Some m) /\
+  (forall i j k, (delivered gs i j k) = true -> (delivered gs' i j k) = true).
+
+Notation "A <== B" := (Low_mono A B) (at level 80).
+
+(* Monotonicity & Witness *)
+
+Theorem Low_Level_Monotonicity : forall s s', (s <<= s') -> (s <== s').
+Proof.
+Admitted.
+
+Theorem Low_Level_Witness : forall (A : Type) s s' (f : GlobalState -> A), (s <<= s') -> (f s <> f s') -> (exists s'', s <<= s'' /\ (step s'') <<= s' /\ (f s = f s'') /\ (f s <> f (step s''))).
+Proof.
+Admitted.

@@ -4,7 +4,7 @@ Require Import Program Arith List CpdtTactics.
 
 Load Assumption.
 Load Low_def.
-Load High_def.
+Load High_proof.
 
 Definition ref_map_local (lls : option LocalState) : (option HLocalState) :=
   match lls with
@@ -18,6 +18,48 @@ Definition ref_map_local (lls : option LocalState) : (option HLocalState) :=
 Definition ref_map (lgs : GlobalState) : HGlobalState :=
   HGS (n lgs) (compose ref_map_local (local_states lgs)).
 
+Definition ref_mapp (p : InitialParams) : HInitialParams :=
+  HInitP (inputs p) (f_to_n (numf p)).
+
+Theorem Refinementp : forall params, isValidP params -> HisValid (ref_mapp params) (ref_map (initGS params)).
+Proof.
+  intros.
+  unfold HisValid.
+  eapply HONE.
+  assert ((HinitGS (ref_mapp params)) = (ref_map (initGS params))).
+  unfold HinitGS.
+  unfold ref_map.
+  unfold ref_mapp.
+  unfold initGS.
+  destruct params.
+  simpl.
+  unfold ref_map_local.
+  match goal with
+    | H : _ |- (HGS _ ?f1) = (HGS _ ?f2) => assert (f1 = f2) as hfeq
+  end.
+  unfold compose.
+  apply fun_eqiv.
+  intros.
+  unfold HinitLS.
+  unfold initLS.
+  destruct (x <? f_to_n numf0).
+  auto.
+  auto.
+  rewrite hfeq.
+  auto.
+  rewrite H0.
+  eapply NOTHING.
+Qed.
+
+Theorem Refinement : forall params gs, isValid params gs -> HStep (ref_map gs) (ref_map (step gs)).
+Proof.
+Admitted.
+
+Theorem Refinement' : forall params gs, isValid params gs -> HisValid (ref_mapp params) (ref_map gs).
+Proof.
+Admitted.
+
+(*
 Ltac matchFun :=
   match goal with
   | H : _ |- HStep (HGS _ ?f1) (HGS _ ?f2) => assert (f1 = f2) as hfeq
@@ -207,3 +249,4 @@ Proof.
     + (* Out of range: NOTHING *)
       caseNothing m Heqlsi.
 Admitted.
+*)
