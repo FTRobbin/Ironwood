@@ -20,3 +20,13 @@ Definition Always {A : Type} `{State A} (p : A -> Prop) : A -> Prop :=
 
 Definition Eventually {A : Type} `{State A} (p : A -> Prop) : A -> Prop :=
   fun s => exists s', leq s s' /\ p s'.
+
+(* TODO Define temporal logic on traces instead of states,
+  traces can be defined co-inductively
+  
+  trace {A: Trace} := | single | cons
+  
+  Always : (State -> Prop) -> Trace order next -> Prop
+
+  So this would onle require to define next on reachable states
+*)

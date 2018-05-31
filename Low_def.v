@@ -270,6 +270,7 @@ Theorem Low_Level_Monotonicity : forall s s', (s <<= s') -> (s <== s').
 Proof.
 Admitted.
 
+(* TODO To write the witness as a function *)
 Theorem Low_Level_Witness : forall (A : Type) s s' (f : GlobalState -> A), (s <<= s') -> (f s <> f s') -> (exists s'', s <<= s'' /\ (step s'') <<= s' /\ (f s = f s'') /\ (f s <> f (step s''))).
 Proof.
 Admitted.
