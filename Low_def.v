@@ -258,7 +258,7 @@ Definition Low_mono : GlobalState -> GlobalState -> Prop :=
   (n gs) = (n gs') /\
   (f gs) = (f gs') /\
   (CQ gs) = (CQ gs') /\
-  (forall i ls ls', ((local_states gs) i) = Some ls -> ((local_states gs') i = Some ls' /\ (LowL_mono ls ls'))) /\
+  (forall i ls, ((local_states gs) i) = Some ls -> (exists ls', (local_states gs') i = Some ls' /\ (LowL_mono ls ls'))) /\
   (forall i j k m, (message_archive gs i j k) = Some m -> (message_archive gs' i j k) = Some m) /\
   (forall i j k, (delivered gs i j k) = true -> (delivered gs' i j k) = true).
 
