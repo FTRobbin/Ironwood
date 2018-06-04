@@ -144,9 +144,15 @@ Definition extract_history (i : nat) (gs : GlobalState) :=
   | None => None
   end.
 
+Definition extract_historyr (i : nat) (gs : GlobalState) (r : nat) :=
+  match (local_states gs) i with
+  | Some (Honest ls) => Some (history ls r)
+  | None => None
+  end.
+
 Definition extract_historyrj (i : nat) (gs : GlobalState) (r : nat) (j : nat):=
   match (local_states gs) i with
-  | Some (Honest ls) => (history ls r j)
+  | Some (Honest ls) => history ls r j
   | None => None
   end.
 
@@ -156,18 +162,28 @@ Definition extract_estimationr (i : nat) (gs : GlobalState) (r : nat) :=
   | None => None
   end.
 
+Definition extract_round (i : nat) (gs : GlobalState) :=
+  match (local_states gs) i with
+  | Some (Honest ls) => Some (hl_round_no ls)
+  | None => None
+  end.
+
+(* Trivial *)
 Lemma Core1_1 : forall params i, extract_decision i (initGS params) = None.
 Proof.
 Admitted.
 
+(* Trivial *)
 Lemma Core1_2 : forall s : option bool, s <> None -> exists b, s = Some b.
 Proof.
 Admitted.
 
+(* Simple *)
 Lemma Core1_3 : forall gs gs' i b, extract_decision i gs = Some b -> gs <<= gs' -> extract_decision i gs' = Some b.
 Proof.
 Admitted.
 
+(* Simple *)
 Lemma Core1 : forall params gs i b, isValid params gs -> extract_decision i gs = Some b -> 
   exists gs', isValid params gs' /\ step gs' <<= gs /\ extract_decision i gs' = None /\ extract_decision i (step gs') = Some b.
 Proof.
@@ -185,66 +201,430 @@ Ltac forget v :=
     end) ; clear v Heq
   end.
   
-
+(* Trivial *)
 Lemma Core3_1 : forall gs i b, extract_decision i gs = Some b -> exists h, extract_history i gs = Some h.
 Proof.
 Admitted.
 
+(* Medium *)
 Lemma Core3_2 : forall gs i b h, extract_decision i gs = None -> extract_decision i (step gs) = Some b ->
   extract_history i (step gs) = Some h ->
   exists qi, qi < coq_m (CQ (step gs)) /\ testone (n (step gs)) (coq_sq (CQ (step gs)) qi) h = Some b.
 Proof.
 Admitted.
 
+(* Trivial *)
 Lemma Core3_3 : forall params gs, isValid params gs -> coq_cq params = CQ gs.
 Proof.
 Admitted.
 
+(* Trivial *)
+Lemma Core3_4_1 : forall params gs gs', isValid params gs -> gs <<= gs' -> isValid params gs'.
+Proof.
+Admitted.
+
+(* Trivial *)
 Lemma Core3_4 : forall params gs, isValid params gs -> isValid params (step gs).
 Proof.
 Admitted.
 
+(* Trivial *)
 Lemma Core3_5 : forall params gs, isValid params gs -> n_CoQuorum_valid (CQ gs) (n gs).
 Proof.
 Admitted.
 
-Lemma Core3_6 : forall gs b h sq k, testone (n gs) sq h = Some b -> sq k = true -> 
+(* Medium *)
+Lemma Core3_6 : forall gs b h sq k, testone (n gs) sq h = Some b -> k < (n gs) -> sq k = true -> 
   exists m, h k = Some m /\ vote m = Some b.
 Proof.
 Admitted.
 
+(* Trivial *)
 Lemma Core3_7 : forall gs gs', gs <<= gs' -> (n gs = n gs').
 Proof.
 Admitted.
 
+(* Medium *)
+Lemma Core3_8_1 : forall params gs i r, isValid params gs -> extract_round i gs = Some r -> r = (round_no gs).
+Proof.
+Admitted.
+
+(* Medium *)
 Lemma Core3_8 : forall params gs gs' i h j m, isValid params gs -> gs <<= gs' -> extract_history i gs = Some h -> h j = Some m -> extract_historyrj i gs' (round_no gs) j = Some m.
 Proof.
 Admitted.
 
+(* Trivial *)
 Lemma Core3_9 : forall gs i b, extract_decision i gs = None -> extract_decision i (step gs) = Some b -> round_no gs = round_no (step gs).
+Proof.
+Admitted.
+
+(* Medium *)
+Lemma Core3_10_1 : forall params gs r i eb, isValid params gs -> extract_estimationr i gs r = Some eb -> 0 < r ->
+  forall j, j < (n gs) -> exists m, message_archive gs r i j = Some m /\ vote m = Some eb.
+Proof.
+Admitted.
+
+(* Medium *)
+Lemma Core3_10_2 : forall params gs r i j m m', isValid params gs -> extract_historyrj i gs r j = Some m -> message_archive gs r j i = Some m' ->
+  m = m'.
+Proof.
+Admitted.
+
+(* Simple *)
+Lemma Core3_10_3_1 : forall params gs i r j m, isValid params gs -> extract_historyrj i gs r j = Some m -> i < (n gs) /\ 0 < r.
+Proof.
+Admitted.
+
+Lemma Core3_10_3 : forall params gs r i j m eb, isValid params gs -> extract_estimationr i gs r = Some eb -> extract_historyrj j gs r i = Some m ->
+  vote m = Some eb.
+Proof.
+  intros.
+  specialize (Core3_10_3_1 params gs j r i m H H1).
+  intros.
+  destruct H2.
+  specialize (Core3_10_1 params gs r i eb H H0 H3 j H2).
+  intros.
+  destruct H4.
+  destruct H4.
+  specialize (Core3_10_2 params gs r j i m x H H1 H4).
+  intros.
+  rewrite H6.
+  rewrite H5.
+  reflexivity.
+Qed.
+
+(* Medium *)
+Lemma Core3_10_4 : forall params gs r i j m, isValid params gs -> extract_historyrj i gs r j = Some m -> 0 < r /\ r <= (round_no gs) /\ j < n gs.
+Proof.
+Admitted.
+
+(* Medium *)
+Lemma Core3_10_5 : forall params gs r i, isValid params gs -> r <= round_no gs -> i < n gs -> exists b, extract_estimationr i gs r = Some b.
 Proof.
 Admitted.
 
 Lemma Core3_10 : forall params gs r i j k mj mk, isValid params gs -> extract_historyrj j gs r i = Some mj -> extract_historyrj k gs r i = Some mk ->
   vote mj = vote mk.
 Proof.
+  intros.
+  specialize (Core3_10_4 params gs r j i mj H H0).
+  intros.
+  destruct H2.
+  destruct H3.
+  specialize (Core3_10_5 params gs r i H H3 H4).
+  intros.
+  destruct H5.
+  specialize (Core3_10_3 params gs r i j mj x H H5 H0).
+  specialize (Core3_10_3 params gs r i k mk x H H5 H1).
+  intros.
+  rewrite H6.
+  rewrite H7.
+  reflexivity.
+Qed.
+
+(* Trivial *)
+Lemma Core4_1_1_1 : forall params gs i b, isValid params gs -> extract_estimationr i gs (round_no gs) = Some b -> 0 < (round_no gs) ->
+  exists h, extract_historyr i gs (round_no gs - 1) = Some h.
+Proof.
 Admitted.
 
-Lemma Core4_1 : forall params gs i b, isValid params gs -> extract_decision i gs = Some b -> 
+(* Medium *)
+Lemma Core4_1_1_2 : forall params gs i b h, isValid params gs -> extract_estimationr i gs (round_no gs) = Some b -> 0 < (round_no gs) ->
+  extract_historyr i gs (round_no gs - 1) = Some h ->
+  exists cqi, cqi < coq_k (CQ gs) /\ testone (n gs) (coq_csq (CQ gs) cqi) h = Some b.
+Proof.
+Admitted.
+
+Lemma Core4_1_1_3 : forall gs gs', gs <<= gs' -> step gs <<= step gs'.
+Proof.
+  intros.
+  induction H.
+  constructor.
+  constructor.
+  auto.
+Qed.
+
+
+Lemma Core4_1_1 : forall params gs i b, isValid params gs -> extract_decision i gs = None -> extract_decision i (step gs) = Some b -> 
+  (forall gs', gs <<= gs' -> (S (round_no gs) = round_no gs') -> (forall j b0, extract_estimationr j gs' (round_no gs') = Some b0 ->
+  b = b0)).
+Proof.
+  intros.
+  specialize (Core3_1 (step gs) i b H1).
+  intros.
+  destruct H5.
+  remember x as h.
+  forget x.
+  specialize (Core3_2 gs i b h H0 H1 H5).
+  intros.
+  destruct H6.
+  remember x as qi.
+  forget x.
+  destruct H6.
+  assert (isValid params gs').
+  unfold isValid.
+  inversion H.
+  split.
+  assumption.
+  apply (transit (initGS params) gs gs' H9 H2).
+  assert (0 < round_no gs').
+  destruct (round_no gs') ; crush.
+  (* Temporary solution *)
+  rename H9 into H9'.
+  specialize (Core4_1_1_1 params gs' j b0 H8 H4 H9').
+  intros.
+  destruct H9.
+  remember x as hj.
+  forget x.
+  specialize (Core4_1_1_2 params gs' j b0 hj H8 H4 H9' H9).
+  intros.
+  destruct H10.
+  remember x as cqj.
+  forget x.
+  destruct H10.
+  specialize (Core3_3 params (step gs) (Core3_4 params gs H)).
+  specialize (Core3_3 params gs' H8).
+  specialize (Core3_5 params (step gs) (Core3_4 params gs H)).
+  intros.
+  rewrite <- H13 in H11.
+  rewrite H14 in H11.
+  rewrite <- H13 in H10.
+  rewrite H14 in H10.
+  specialize (Core3_7 gs gs' H2).
+  specialize (Core3_7 gs (step gs) (succ gs)).
+  intros.
+  rewrite H15 in H16.
+  rewrite <- H16 in H11.
+  destruct H12.
+  remember (H17 qi cqj H6 H10) as H18.
+  clear HeqH18 H17.
+  destruct H18.
+  remember x as k.
+  forget x.
+  destruct H17.
+  destruct H18.
+  specialize (Core3_6 (step gs) b h (coq_sq (CQ (step gs)) qi) k H7 H17 H18).
+  intros.
+  destruct H20.
+  remember x as mi.
+  forget x.
+  specialize (Core3_6 (step gs) b0 hj (coq_csq (CQ (step gs)) cqj) k H11 H17 H19).
+  intros.
+  destruct H21.
+  remember x as mj.
+  forget x.
+  destruct H20.
+  destruct H21.
+  assert (step gs <<= gs').
+  inversion H2.
+  rewrite H25 in H6.
+  crush.
+  apply (Core4_1_1_3 gs s' H24).
+  specialize (Core3_8 params (step gs) gs' i h k mi (Core3_4 params gs H) H24 H5 H20).
+  intros.
+  assert (extract_historyrj j gs' (round_no gs' - 1) k = Some mj).
+  unfold extract_historyrj.
+  unfold extract_historyr in H9.
+  destruct (local_states gs' j).
+  destruct l.
+  inversion H9.
+  congruence.
+  inversion H9.
+  specialize (Core3_9 gs i b H0 H1).
+  intros.
+  rewrite <- H27 in H25.
+  rewrite <- H3 in H26.
+  simpl in H26.
+  assert (round_no gs - 0 = round_no gs).
+  crush.
+  rewrite H28 in H26.
+  specialize (Core3_10 params gs' (round_no gs) k i j mi mj H8 H25 H26).
+  intros.
+  congruence.
+Qed.
+
+(* Trivial *)
+Lemma Core4_1_2_1 : forall gs, round_no gs = round_no (step gs) \/ S (round_no gs) = round_no (step gs).
+Proof.
+Admitted.
+
+(* Trivial *)
+Lemma Core4_1_2_2 : forall gs gs' r i b, gs <<= gs' -> extract_estimationr i gs r = Some b -> extract_estimationr i gs' r = Some b.
+Proof.
+Admitted.
+
+(* Simple *)
+Lemma Core4_1_2_3 : forall gs gs' r i b, gs <<= gs' -> round_no gs = round_no gs' -> extract_estimationr i gs' r = Some b -> extract_estimationr i gs r = Some b.
+Proof.
+Admitted.
+
+(* Simple *)
+Lemma Core4_1_2_4 : forall params gs r i b, isValid params gs -> extract_estimationr i gs r = Some b -> i < (n gs).
+Proof.
+Admitted.
+
+(* Simple *)
+Lemma Core4_1_2_5 : forall n sq h b, testone n sq h = Some b -> exists k, k < n /\ sq k = true.
+Proof.
+Admitted.
+
+(* Trivial *)
+Lemma Core4_1_2_6 : forall gs r i, round_no gs < round_no (step gs) -> extract_historyr i gs r = extract_historyr i (step gs) r.
+Proof.
+Admitted.
+
+(* Hard *)
+Lemma Core4_1_2 : forall params gs b, isValid params gs -> (forall i b0, extract_estimationr i gs (round_no gs) = Some b0 -> b = b0) ->
+  (forall gs', gs <<= gs' -> (forall j b', extract_estimationr j gs' (round_no gs') = Some b' -> b = b')).
+Proof.
+  intros params gs b H H1 gs' H2.
+  induction H2.
+  auto.
+  remember (IHLow_leq H H1) as H3.
+  clear HeqH3 IHLow_leq.
+  specialize (Core4_1_2_1 s').
+  intro.
+  destruct H0.
+  - intros.
+    apply (H3 j).
+    rewrite <- H0 in H4.
+    apply (Core4_1_2_3 s' (step s') (round_no s') j b' (succ s') H0 H4).
+  - intros.
+    assert (isValid params s').
+    unfold isValid.
+    unfold isValid in H.
+    destruct H.
+    split.
+    assumption.
+    apply (transit (initGS params) s s' H5 H2).
+    assert (0 < round_no (step s')).
+    destruct (round_no (step s')) ; crush.
+    (* Temporary solution *)
+    rename H6 into H6'.
+    specialize (Core4_1_1_1 params (step s') j b' (Core3_4 params s' H5) H4 H6').
+    intros.
+    destruct H6.
+    remember x as h.
+    forget x.
+    assert (round_no (step s') - 1 = round_no s').
+    crush.
+    specialize (Core4_1_1_2 params (step s') j b' h (Core3_4 params s' H5) H4 H6' H6).
+    intros.
+    destruct H8.
+    remember x as cqj.
+    forget x.
+    destruct H8.
+    specialize (Core4_1_2_5 (n (step s')) (coq_csq (CQ (step s')) cqj) h b' H9).
+    intros.
+    destruct H10.
+    remember x as k.
+    forget x.
+    destruct H10.
+    assert (round_no s' <= round_no s').
+    auto.
+    specialize (Core3_7 s' (step s') (succ s')).
+    intros.
+    rewrite <- H13 in H10.
+    specialize (Core3_10_5 params s' (round_no s') k H5 H12 H10).
+    intros.
+    destruct H14.
+    remember x as b0.
+    forget x.
+    remember (H3 k b0 H14) as H15.
+    rewrite H15.
+    clear HeqH15 H15.
+    rewrite H13 in H10.
+    specialize (Core3_6 (step s') b' h (coq_csq (CQ (step s')) cqj) k H9 H10 H11).
+    intros.
+    destruct H15.
+    remember x as m.
+    forget x.
+    destruct H15.
+    rewrite H7 in H6.
+    assert (round_no s' < round_no (step s')).
+    crush.
+    specialize (Core4_1_2_6 s' (round_no s') j H17).
+    intros.
+    rewrite <- H18 in H6.
+    assert (extract_historyrj j s' (round_no s') k = Some m).
+    unfold extract_historyrj.
+    unfold extract_historyr in H6.
+    destruct (local_states s' j).
+    destruct l.
+    congruence.
+    inversion H6.
+    specialize (Core3_10_3 params s' (round_no s') k j m b0 H5 H14 H19).
+    congruence.
+Qed.
+
+(* Trivial *)
+Lemma Core4_1_3 : forall gs gs', gs <<= gs' -> (round_no gs < round_no gs') -> exists gs'', gs <<= gs'' /\ gs'' <<= gs' /\ (S (round_no gs) = round_no gs'').
+Proof.
+Admitted.
+
+Lemma Core4_1 : forall params gs i b, isValid params gs -> extract_decision i gs = None -> extract_decision i (step gs) = Some b -> 
   (forall gs', gs <<= gs' -> (round_no gs < round_no gs') -> (forall j b0, extract_estimationr j gs' (round_no gs') = Some b0 ->
   b = b0)).
 Proof.
-Admitted.
+  intros.
+  specialize (Core4_1_3 gs gs' H2 H3).
+  intros.
+  destruct H5.
+  remember x as gs''.
+  forget x.
+  destruct H5.
+  destruct H6.
+  specialize (Core4_1_1 params gs i b H H0 H1 gs'' H5 H7).
+  intros.
+  apply (Core4_1_2 params gs'' b (Core3_4_1 params gs gs'' H H5) H8 gs' H6 j b0 H4).
+Qed.
 
-Lemma Core4_2 : forall params gs r i, isValid params gs -> 0 < r -> r <= round_no gs -> i < (n gs) -> (exists b, extract_estimationr i gs r = Some b).
-Proof.
-Admitted.
 
-(* Low_Level_Validity *)
-Lemma Core4_3 : forall params gs i b b0, isValid params gs -> extract_decision i gs = None -> extract_decision i (step gs) = Some b -> 
+(* not validity since it does not necessarily decides *)
+Lemma Core4_2 : forall params gs i b b0, isValid params gs -> extract_decision i gs = None -> extract_decision i (step gs) = Some b -> 
   (forall j, j < (n gs) -> extract_estimationr j gs (round_no gs) = Some b0) -> b = b0.
 Proof.
-Admitted.
+  intros.
+  specialize (Core3_1 (step gs) i b H1).
+  intros.
+  destruct H3.
+  remember x as h.
+  forget x.
+  specialize (Core3_2 gs i b h H0 H1 H3).
+  intros.
+  destruct H4.
+  remember x as qi.
+  forget x.
+  destruct H4.
+  specialize (Core4_1_2_5 (n (step gs)) (coq_sq (CQ (step gs)) qi) h b H5).
+  intros.
+  destruct H6.
+  remember x as k.
+  forget x.
+  destruct H6.
+  specialize (Core3_6 (step gs) b h (coq_sq (CQ (step gs)) qi) k H5 H6 H7).
+  intros.
+  destruct H8.
+  remember x as m.
+  forget x.
+  destruct H8.
+  specialize (Core3_7 gs (step gs) (succ gs)).
+  intros.
+  rewrite <- H10 in H6.
+  remember (H2 k H6) as H11.
+  specialize (Core3_9 gs i b H0 H1).
+  intros.
+  clear HeqH11.
+  rewrite H12 in H11.
+  specialize (Core4_1_2_2 gs (step gs) (round_no (step gs)) k b0 (succ gs) H11).
+  intros.
+  specialize (Core3_8 params (step gs) (step gs) i h k m (Core3_4 params gs H) (reflex (step gs)) H3 H8).
+  intros.
+  specialize (Core3_10_3 params (step gs) (round_no (step gs)) k i m b0 (Core3_4 params gs H) H13 H14).
+  intros.
+  congruence.
+Qed.
 
 Theorem coreCase : forall params gs gs' i j b b0, isValid params gs -> gs' = step gs ->
   extract_decision i gs = None -> extract_decision j gs = Some b0 -> extract_decision i gs' = Some b ->
@@ -317,13 +697,13 @@ Proof.
     forget x.
     destruct H20.
     destruct H21.
-    specialize (Core3_6 (step gs) b hi (coq_sq (CQ (step gs)) qi) k H14 H21).
+    specialize (Core3_6 (step gs) b hi (coq_sq (CQ (step gs)) qi) k H14 H20 H21).
     assert (step gs0 <<= step gs).
     apply (transit (step gs0) gs (step gs)).
     assumption.
     apply (succ gs).
     rewrite (Core3_7 (step gs0) (step gs) H23) in H15.
-    specialize (Core3_6 (step gs) b0 hj (coq_sq (CQ (step gs)) qj) k H15 H22).
+    specialize (Core3_6 (step gs) b0 hj (coq_sq (CQ (step gs)) qj) k H15 H20 H22).
     intros.
     destruct H24.
     remember x as mkj.
@@ -353,11 +733,8 @@ Proof.
     assert (round_no gs0 < round_no gs).
     induction m ; crush.
     clear m H9 H11 H10.
-    specialize (Core3_9 gs0 j b0 H6 H7).
-    intros.
-    rewrite H9 in H12.
     forget gs'.
-    specialize (Core4_1 params (step gs0) j b0 (Core3_4 params gs0 H4) H7 gs H5 H12).
+    specialize (Core4_1 params gs0 j b0 H4 H6 H7 gs H8 H12).
     intros.
     assert (forall j, j < (n gs) -> extract_estimationr j gs (round_no gs) = Some b0).
     + intros.
@@ -365,13 +742,13 @@ Proof.
       destruct (round_no (step gs0)) ; crush.
       assert (round_no gs <= round_no gs).
       crush.
-      specialize (Core4_2 params gs (round_no gs) j0 H H11 H13 H10).
+      specialize (Core3_10_5 params gs (round_no gs) j0 H H11 H9).
       intros.
-      destruct H14.
-      rewrite (H0 j0 x H14).
+      destruct H13.
+      rewrite (H0 j0 x H13).
       auto.
     + clear H0.
-      apply (Core4_3 params gs i b b0 H H1 H3 H10).
+      apply (Core4_2 params gs i b b0 H H1 H3 H9).
 Qed.
 
 (*

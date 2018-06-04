@@ -190,7 +190,7 @@ Inductive Steps : GlobalState -> GlobalState -> Prop :=
 Record InitialParams := InitP {inputs : nat -> bool; numf : nat; coq_cq : n_CoQuorum}.
 
 Definition initLS (i : nat) (b : bool) :=
-  Honest (HLS 0 b (fun r => None) (fun r j => None) None).
+  Honest (HLS 0 b (fun r => if (r =? 0) then Some b else None) (fun r j => None) None).
 
 Definition f_to_n f := 5 * f + 1.
 
@@ -266,10 +266,12 @@ Notation "A <== B" := (Low_mono A B) (at level 80).
 
 (* Monotonicity & Witness *)
 
+(* Medium *)
 Theorem Low_Level_Monotonicity : forall s s', (s <<= s') -> (s <== s').
 Proof.
 Admitted.
 
+(* Medium *)
 (* TODO To write the witness as a function *)
 Theorem Low_Level_Witness : forall (A : Type) s s' (f : GlobalState -> A), (s <<= s') -> (f s <> f s') -> (exists s'', s <<= s'' /\ (step s'') <<= s' /\ (f s = f s'') /\ (f s <> f (step s''))).
 Proof.

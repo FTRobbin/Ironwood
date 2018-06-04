@@ -16,4 +16,4 @@ Definition n_CoQuorum_valid (cq : n_CoQuorum) (n : nat) :=
   let k := coq_k cq in
   let csq := coq_csq cq in
   n_Quorum_valid (Q n m sq) /\
-  (forall i j, i < m -> j < k -> (exists t, t < n /\ (sq i t) = true /\ (csq j k) = true)).
+  (forall i j, i < m -> j < k -> (exists t, t < n /\ (sq i t) = true /\ (csq j t) = true)).
