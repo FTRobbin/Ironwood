@@ -991,6 +991,8 @@ Proof.
       unfold step_round_loc.
       destruct (local_states gs x).
       destruct l.
+      destruct (estimation ls (hl_round_no ls + 1)).
+      auto.
       auto.
       auto.
     + rewrite hfeq.

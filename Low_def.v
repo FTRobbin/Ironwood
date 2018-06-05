@@ -1,6 +1,6 @@
 (* Definition of low-level model and semantics *)
 
-Require Import Program Arith List.
+Require Import Program Arith List CpdtTactics EquivDec.
 
 Load Quorum.
 Load Temporal.
@@ -81,7 +81,10 @@ Definition step_round_loc (n : nat) (cq : n_CoQuorum) (ls : LocalState) : LocalS
     let e := estimation ls' in
     let h := history ls' in
     let d := decision ls' in
-    Honest (HLS (r + 1) b (fun r' => if (r' =? r + 1) then (estimate n cq (h r)) else e r') h d)
+    match e (r + 1) with
+    | None => Honest (HLS (r + 1) b (fun r' => if (r' =? r + 1) then (estimate n cq (h r)) else e r') h d)
+    | Some _ => Honest (HLS (r + 1) b e h d)
+    end
   end.
 
 Definition step_round (n : nat) (cq : n_CoQuorum) (lss : nat -> option LocalState) :=
@@ -115,7 +118,12 @@ Definition step_deliver_loc (n : nat) (cq : n_CoQuorum) (ls : LocalState) (m : M
       let d := decision ls' in
       let nh := (match h rm sender_id with
         | Some _ => h
-        | None => (fun r' s' => (if (andb (r' =? rm) (s' =? sender_id)) then Some m else (h r' s')))
+        | None => (fun r' s' => (if (andb (r' =? rm) (s' =? sender_id)) then 
+            match (h r' s') with
+            | Some m' => Some m'
+            | None => Some m
+            end
+            else (h r' s')))
         end) in
       match d with
       | Some _ => Honest (HLS r b e nh d)
@@ -153,7 +161,12 @@ Definition get_undelivered (n : nat) (msg : nat -> nat -> option Message) (d : n
   ext_first msg_list flag_list.
 
 Definition update_messages (r : nat) (msg : nat -> nat -> nat -> option Message) (nmsg : nat -> nat -> option Message) :=
-  fun r' i j => if (r' =? r) then (nmsg i j) else msg r' i j.
+  fun r' i j => if (r' =? r) then 
+    match msg r' i j with
+    | Some m => Some m
+    | None => (nmsg i j) 
+    end
+  else msg r' i j.
 
 Definition update_delivered (r : nat) (d : nat -> nat -> nat -> bool) (m : Message) :=
   fun r' i' j' => match m with
@@ -264,15 +277,126 @@ Definition Low_mono : GlobalState -> GlobalState -> Prop :=
 
 Notation "A <== B" := (Low_mono A B) (at level 80).
 
+Theorem Mono_reflex : forall gs, gs <== gs.
+Proof.
+  intros.
+  unfold Low_mono.
+  unfold LowL_mono.
+  crush.
+  exists ls.
+  destruct ls.
+  crush.
+Qed.
+
+Theorem Mono_transit : forall gs gs' gs'', gs <== gs' -> gs' <== gs'' -> gs <== gs''.
+Proof.
+  unfold Low_mono.
+  unfold LowL_mono.
+  crush.
+  remember (H7 i ls H11) as H14.
+  destruct H14.
+  destruct a.
+  remember (H8 i x e) as H15.
+  destruct H15.
+  exists x0.
+  destruct a.
+  split.
+  assumption.
+  clear H7 H8 HeqH14 HeqH15.
+  destruct ls.
+  destruct x.
+  destruct x0.
+  crush.
+Qed.
+
+Theorem Mono_succ : forall gs, gs <== step gs.
+Proof.
+  intros.
+  unfold Low_mono.
+  unfold LowL_mono.
+  unfold step.
+  remember (get_undelivered (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs))) as sm.
+  unfold step_deliver.
+  unfold update_delivered.
+  unfold step_deliver_loc.
+  unfold step_message.
+  unfold update_messages.
+  unfold step_round.
+  unfold step_round_loc.
+  unfold step_message_from_to.
+  destruct sm ; crush.
+  - remember (i =? receiver_id m) as is_receiver.
+    destruct is_receiver.
+    + exists (step_deliver_loc (n gs) (CQ gs) ls m).
+      unfold step_deliver_loc.
+      specialize (beq_nat_true i (receiver_id m)).
+      rewrite <- Heqis_receiver.
+      intros.
+      rewrite <- H0 ; auto.
+      rewrite H.
+      destruct ls.
+      destruct (decision ls) ; crush ;
+      remember (history ls (m_round_no m) (sender_id m)) as hm ;
+      destruct hm ; auto ;
+      remember (i0 =? (m_round_no m)) as b0;
+      remember (j =? (sender_id m)) as b1;
+      destruct b0 ; destruct b1 ; crush.
+    + exists ls.
+      destruct ls.
+      crush.
+  - destruct m.
+    destruct (andb (andb (i =? round_no gs) (j =? sender_id0)) (k =? receiver_id0)) ; crush.
+  - exists (step_round_loc (n gs) (CQ gs) ls).
+    unfold step_round_loc.
+    destruct ls.
+    remember (estimation ls (hl_round_no ls + 1)) as eb.
+    destruct eb ; crush.
+    remember (i0 =? hl_round_no ls + 1).
+    destruct b0 ; crush.
+    specialize (beq_nat_true i0 (hl_round_no ls + 1)).
+    rewrite Heqb0.
+    crush.
+  - destruct (i =? round_no gs) ; crush.
+Qed.
+
 (* Monotonicity & Witness *)
 
 (* Medium *)
 Theorem Low_Level_Monotonicity : forall s s', (s <<= s') -> (s <== s').
 Proof.
-Admitted.
+  intros.
+  induction H.
+  - eapply Mono_reflex.
+  - eapply (Mono_transit s s').
+    auto.
+    eapply Mono_succ.
+Qed.
 
 (* Medium *)
 (* TODO To write the witness as a function *)
-Theorem Low_Level_Witness : forall (A : Type) s s' (f : GlobalState -> A), (s <<= s') -> (f s <> f s') -> (exists s'', s <<= s'' /\ (step s'') <<= s' /\ (f s = f s'') /\ (f s <> f (step s''))).
+Theorem Low_Level_Witness : forall {A : Type} `{EqDec A eq} s s' (f : GlobalState -> A), (s <<= s') -> (f s <> f s') -> (exists s'', s <<= s'' /\ (step s'') <<= s' /\ (f s = f s'') /\ (f s <> f (step s''))).
 Proof.
-Admitted.
+  intros.
+  induction H0.
+  - congruence.
+  - destruct (equiv_dec (f0 s) (f0 s')).
+    + unfold equiv in e.
+      exists s'.
+      split.
+      apply H0.
+      split.
+      eapply reflex.
+      split.
+      auto.
+      auto.
+    + unfold equiv in c.
+      unfold complement in c.
+      remember (IHLow_leq c) as H2.
+      destruct H2.
+      exists x.
+      destruct a.
+      destruct a.
+      destruct a.
+      split ; auto; split ; auto.
+      apply (transit (step x) s' (step s') l0 (succ s')).
+Qed.
