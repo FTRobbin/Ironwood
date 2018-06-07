@@ -178,7 +178,7 @@ Fixpoint get_undelivered1d (n : nat) (msg : nat -> option Message) (d : nat -> b
   match n with
   | O => None
   | S n' => match ((msg n'), (d n')) with
-    | (Some m, true) => Some m
+    | (Some m, false) => Some m
     | _ => get_undelivered1d n' msg d
     end
   end.
