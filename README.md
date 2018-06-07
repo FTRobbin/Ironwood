@@ -21,20 +21,19 @@ The author's version is [Coq 8.7.1](https://github.com/coq/coq/releases/tag/V8.7
   * More complex protocol
   * Extract to executables
 
-## File structure
-| Assumption.v |  |
-| High_def.v | High-level protocol semantics |
-| High_proof.v | High-level agreement proof |
-| Low_def.v | Low-level protocol semantics, Low-level state properties |
-| Low_proof.v | Low-level agreement proof |
-| Quorum.v | Quorum abstraction |
-| Refinement.v | Proof of the refinement theorem |
-| Temporal.v | (Not so successful atempt) to adopt temporal logic |
-
 ## Proof organization
-`Low_def.v` contains the protocol, `Low_Level_Monotonicity` and `Low_Level_Witness`.
+| File | Description |
+| --- | --- |
+| Assumption.v | Assumptions |
+| High_def.v | Abstract protocol semantics |
+| High_proof.v | Abstract agreement proof |
+| Low_def.v | Protocol implmentation, basic properties |
+| Low_proof.v | Agreement proof |
+| Quorum.v | Quorum abstraction |
+| Refinement.v | Refinement theorem (and all the lemmas)|
+| Temporal.v | (A not so successful atempt) to adopt temporal logic |
 
-`Refinement.v` contains almost all the proof code. The core theorem is `Refinement`, it relies solely on lemma `coreCase` which is decomposed into a handful of smaller lemmas. These lesser lemmas are built top-down. They form a tree-like structure rooting from the `coreCase`, which are named recursively in the form of `CoreX_Y_Z_...` means it is the `Z`-th lemma to support lemma `CoreX_Y`. Though some lemmas are moved around and reused in other places.
+The core theorem is `Refinement` in `Refinement.v`, it relies solely on lemma `coreCase` which is decomposed into a handful of smaller lemmas. These lesser lemmas are built top-down. They form a tree-like structure rooting from the `coreCase`, which are named recursively in the form of `CoreX_Y_Z_...` means it is the `Z`-th lemma to support lemma `CoreX_Y`. Though some lemmas are moved around and reused in other places.
 
 ---
 Haobin Ni, Cornell University, 2018
