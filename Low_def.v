@@ -19,6 +19,7 @@ Record GlobalState := GS {round_no : nat; n : nat; f : nat; CQ : n_CoQuorum; loc
 
 (* Semantics *)
 
+(*
 Fixpoint testone' (n : nat) (st : nat -> bool) (h : nat -> option Message) (b : bool): option bool :=
   match n with
   | O => Some b
@@ -26,7 +27,7 @@ Fixpoint testone' (n : nat) (st : nat -> bool) (h : nat -> option Message) (b : 
     | true => match h n' with
       | Some m => let v' := vote m in
         match v' with
-        | Some b => testone' n' st h b
+        | Some b' => if (b' == b) then testone' n' st h b else None
         | _ => None
         end 
       | None => None
@@ -35,7 +36,7 @@ Fixpoint testone' (n : nat) (st : nat -> bool) (h : nat -> option Message) (b : 
     end
   end.
 
-Fixpoint testone (n : nat) (st : nat -> bool) (h : nat -> option Message) : option bool :=
+Fixpoint testone (n : nat) (st : nat -> bool) (h : nat -> option Message) : optioni bool :=
   match n with
   | O => None
   | S n' => match st n' with
@@ -50,6 +51,16 @@ Fixpoint testone (n : nat) (st : nat -> bool) (h : nat -> option Message) : opti
     | false => testone n' st h
     end
   end.
+*)
+
+Definition filter (h : nat -> option Message) :=
+  (fun i => match h i with
+            | Some (MSG _ _ _ (Some b')) => Some b'
+            | _ => None
+            end).
+
+Definition testone (n : nat) (st : nat -> bool) (h : nat -> option Message) : option bool :=
+  check_quorum_infer n st (filter h).
 
 (* The universe is [0..n-1], there are m quorums to test in sq, hr is the set of messages for the current round
    Returns some bool when there is a unaminous quorum
@@ -97,7 +108,7 @@ Definition step_round (n : nat) (cq : n_CoQuorum) (lss : nat -> option LocalStat
 Definition step_message_from_to (ls : LocalState) (source : nat) (dest : nat) : Message :=
   match ls with
   | Honest ls' => let r := hl_round_no ls' in
-    MSG r source dest (estimation ls' r)
+    MSG source dest r (estimation ls' r)
   end.
 
 Definition step_message (n : nat) (lss : nat -> option LocalState) : nat -> nat -> option Message :=
@@ -125,10 +136,11 @@ Definition step_deliver_loc (n : nat) (cq : n_CoQuorum) (ls : LocalState) (m : M
             end
             else (h r' s')))
         end) in
-      match d with
-      | Some _ => Honest (HLS r b e nh d)
-      | None => Honest (HLS r b e nh (decide n cq (nh r)))
-      end
+      let nd := (match d with
+        | Some _ => d
+        | None => decide n cq (nh r)
+      end) in
+      Honest (HLS r b e nh nd)
     end.
 
 Definition step_deliver (n : nat) (cq : n_CoQuorum) (lss : nat -> option LocalState) (m : Message) :=
@@ -141,6 +153,7 @@ Definition step_deliver (n : nat) (cq : n_CoQuorum) (lss : nat -> option LocalSt
         end
     else lss i.
 
+(*
 Definition d1_map {A : Type} (n : nat) (m : nat -> nat -> A) : nat -> list A :=
   fun i => map (m i) (seq 0 n).
 
@@ -159,6 +172,28 @@ Definition get_undelivered (n : nat) (msg : nat -> nat -> option Message) (d : n
   let msg_list := d2_map n msg in
   let flag_list := d2_map n d in
   ext_first msg_list flag_list.
+*)
+
+Fixpoint get_undelivered1d (n : nat) (msg : nat -> option Message) (d : nat -> bool) :=
+  match n with
+  | O => None
+  | S n' => match ((msg n'), (d n')) with
+    | (Some m, true) => Some m
+    | _ => get_undelivered1d n' msg d
+    end
+  end.
+
+Fixpoint get_undelivered2d (n : nat) (m : nat) (msg : nat -> nat -> option Message) (d : nat -> nat -> bool) :=
+  match n with
+  | O => None
+  | S n' => match get_undelivered1d m (msg n') (d n') with
+    | Some m => Some m
+    | None => get_undelivered2d n' m msg d
+    end
+  end.
+
+Definition get_undelivered (n : nat) (msg : nat -> nat -> option Message) (d : nat -> nat -> bool) :=
+  get_undelivered2d n n msg d.
 
 Definition update_messages (r : nat) (msg : nat -> nat -> nat -> option Message) (nmsg : nat -> nat -> option Message) :=
   fun r' i j => if (r' =? r) then 
@@ -185,7 +220,7 @@ Definition step (gs : GlobalState) : GlobalState :=
   match m' with
   | None => let nlss := step_round n cq lss in
             let nmsg := step_message n nlss in
-      GS (r + 1) n f cq nlss (update_messages r msgs nmsg) d
+      GS (r + 1) n f cq nlss (update_messages (r + 1) msgs nmsg) d
   | Some m => GS r n f cq (step_deliver n cq lss m) msgs (update_delivered r d m)
   end.
 
@@ -200,7 +235,8 @@ Inductive Steps : GlobalState -> GlobalState -> Prop :=
 
 (* Initial value & validity *)
 
-Record InitialParams := InitP {inputs : nat -> bool; numf : nat; coq_cq : n_CoQuorum}.
+Record InitialParams := InitP {inputs : nat -> bool; numf : nat; coq_cq : n_CoQuorum; 
+                               cond := fun n b => forall i, i < n -> (b i = Some true) \/ (b i = Some false)}.
 
 Definition initLS (i : nat) (b : bool) :=
   Honest (HLS 0 b (fun r => if (r =? 0) then Some b else None) (fun r j => None) None).
@@ -212,7 +248,10 @@ Definition initGS (params : InitialParams) :=
   let f := numf params in 
   let cq := coq_cq params in
   let n := f_to_n f in
-  GS 0 n f cq (fun i => if (i <? n) then Some (initLS i (input i)) else None) (fun r i j => None) (fun r i j => false).
+  let ls := (fun i => if (i <? n) then Some (initLS i (input i)) else None) in
+  let empty := (fun r i j => None) in
+  let nmsg := step_message n ls in
+  GS 0 n f cq ls (update_messages 0 empty nmsg) (fun r i j => false).
 
 
 (* TODO use monads to abstract the low-level semantics for later updates 
@@ -242,7 +281,7 @@ Defined.
 Notation "A <<= B" := (Low_leq A B) (at level 80).
 
 Definition isValidP (params : InitialParams) :=
-  n_CoQuorum_valid (coq_cq params) (f_to_n (numf params)).
+  n_CoQuorum_valid (coq_cq params) (f_to_n (numf params)) (cond params).
 
 Definition isValid (params : InitialParams) (gs : GlobalState) :=
   isValidP params /\ (initGS params) <<= gs.
@@ -356,7 +395,7 @@ Proof.
     specialize (beq_nat_true i0 (hl_round_no ls + 1)).
     rewrite Heqb0.
     crush.
-  - destruct (i =? round_no gs) ; crush.
+  - destruct (i =? round_no gs + 1) ; crush.
 Qed.
 
 (* Monotonicity & Witness *)
