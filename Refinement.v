@@ -1309,15 +1309,15 @@ Proof.
     destruct m0.
     + remember (dev n) as d0.
       destruct d0.
-      exists n.
-      split.
-      congruence.
-      auto.
       fold get_undelivered1d in H.
       specialize (IHn H).
       destruct IHn.
       exists x.
       crush.
+      exists n.
+      split.
+      congruence.
+      auto.
     + fold get_undelivered1d in H.
       specialize (IHn H).
       destruct IHn.
@@ -1710,24 +1710,814 @@ Proof.
   crush.
 Qed.
 
+(* Simple *)
+Lemma Core4_1_2_3 : forall gs gs' r i b, gs <<= gs' -> round_no gs = round_no gs' -> extract_estimationr i gs' r = Some b -> extract_estimationr i gs r = Some b.
+Proof.
+  intros.
+  induction H.
+  - auto.
+  - assert (round_no s = round_no s').
+    specialize (Core4_1_2_1 s').
+    intros.
+    assert (round_no s <= round_no s').
+    specialize (Low_Level_Monotonicity s s' H).
+    intros.
+    destruct H3.
+    auto.
+    destruct H2 ; crush.
+    rewrite IHLow_leq ; auto.
+    remember (step s') as s''.
+    unfold step in Heqs''.
+    destruct (get_undelivered (n s') (message_archive s' (round_no s')) (delivered s' (round_no s'))).
+    rewrite Heqs'' in H1.
+    rewrite <- H1.
+    unfold extract_estimationr.
+    unfold step_deliver.
+    simpl.
+    remember (i =? receiver_id m) as isreceiver.
+    destruct isreceiver.
+    assert (i = receiver_id m).
+    eapply (beq_nat_true).
+    auto.
+    rewrite <- H3.
+    destruct (local_states s' i).
+    destruct l.
+    unfold step_deliver_loc.
+    simpl.
+    auto.
+    auto.
+    auto.
+    rewrite Heqs'' in H0.
+    simpl in H0.
+    crush.
+Qed.
+
+Lemma Core3_10_5_1_1_1 : forall params gs r, isValid params gs -> (round_no gs) < r -> 
+  (forall i j, message_archive gs r i j = None /\ extract_historyrj i gs r j = None /\ extract_estimationr i gs r = None /\ delivered gs r i j = false).
+Proof.
+  intros.
+  inversion H.
+  remember (initGS params) as gs0.
+  induction H2.
+  - unfold initGS in Heqgs0.
+    destruct params.
+    unfold update_messages in Heqgs0.
+    unfold step_message in Heqgs0.
+    unfold extract_historyrj.
+    unfold extract_estimationr.
+    rewrite Heqgs0.
+    simpl.
+    assert (r =? 0 = false).
+    eapply (beq_nat_false_iff).
+    crush.
+    rewrite H2.
+    unfold initLS.
+    remember (i <? f_to_n numf0) as inrange.
+    destruct inrange.
+    + simpl.
+      rewrite H2.
+      tauto.
+    + tauto.
+  - assert (round_no s' <= round_no (step s')).
+    specialize (Low_Level_Monotonicity s' (step s') (succ s')).
+    intros.
+    destruct H3.
+    auto.
+    assert (round_no s' < r).
+    crush.
+    assert (isValid params s').
+    unfold isValid.
+    split.
+    auto.
+    congruence.
+    specialize (IHLow_leq H5 H4 Heqgs0).
+    remember (step s') as s''.
+    unfold step in Heqs''.
+    remember (get_undelivered (n s') (message_archive s' (round_no s')) (delivered s' (round_no s'))) as sm.
+    destruct IHLow_leq.
+    destruct H7.
+    destruct H8.
+    destruct sm.
+    split.
+    rewrite Heqs''.
+    auto.
+    split.
+    remember (extract_historyrj i s'' r j) as nhm.
+    destruct nhm.
+    assert (s'' = step s').
+    unfold step.
+    rewrite <- Heqsm.
+    auto.
+    rewrite H10 in Heqnhm.    
+    specialize (Core3_10_2_2 params s' r i j m0 H5 H7 (eq_sym Heqnhm)).
+    intros.
+    destruct H11.
+    destruct H12.
+    rewrite H10 in H0.
+    rewrite <- H12 in H0.
+    crush.
+    auto.
+    split.
+    unfold extract_estimationr.
+    rewrite Heqs''.
+    unfold step_deliver.
+    simpl.
+    remember (i =? receiver_id m) as isreceiver.
+    destruct isreceiver.
+    assert (i = receiver_id m).
+    eapply (beq_nat_true).
+    auto.
+    rewrite <- H10.
+    unfold extract_estimationr in H8.
+    destruct (local_states s' i).
+    destruct l.
+    unfold step_deliver_loc.
+    simpl.
+    auto.
+    auto.
+    auto.
+    rewrite (Heqs'').
+    simpl.
+    unfold update_delivered.
+    destruct m.
+    assert ((r =? (round_no s')) = false).
+    eapply (beq_nat_false_iff).
+    crush.
+    rewrite H10.
+    simpl.
+    auto.
+    split.
+    rewrite Heqs''.
+    simpl.
+    unfold update_messages.
+    assert (r =? (round_no s' + 1) = false).
+    eapply (beq_nat_false_iff).
+    crush.
+    rewrite H10.
+    auto.
+    split.
+    rewrite Heqs''.
+    unfold extract_historyrj.
+    simpl.
+    unfold extract_historyrj in H7.
+    unfold step_round.
+    destruct (local_states s' i).
+    unfold step_round_loc.
+    destruct l.
+    destruct (estimation ls (hl_round_no ls + 1)).
+    simpl.
+    auto.
+    auto.
+    auto.
+    split.
+    rewrite Heqs''.
+    unfold extract_estimationr.
+    simpl.
+    unfold step_round.
+    unfold extract_estimationr in H8.
+    remember (local_states s' i) as ls.
+    destruct ls.
+    unfold step_round_loc.
+    destruct l.
+    destruct (estimation ls (hl_round_no ls + 1)).
+    auto.
+    simpl.
+    assert (r =? hl_round_no ls + 1 = false).
+    assert (hl_round_no ls = round_no s').
+    assert (extract_round i s' = Some (hl_round_no ls)).
+    unfold extract_round.
+    rewrite <- Heqls.
+    reflexivity.
+    assert (isValid params s').
+    unfold isValid.
+    crush.
+    apply (Core3_8_1 params s' i (hl_round_no ls) H11 H10).
+    eapply (beq_nat_false_iff).
+    rewrite H10.
+    crush.
+    rewrite H10.
+    auto.
+    auto.
+    rewrite Heqs''.
+    simpl.
+    auto.
+Qed.
+
 Lemma Core3_10_5_1_1 : forall params gs, isValid params gs -> (forall i, i < n gs -> exists b, extract_estimationr i gs (round_no gs) = Some b) ->
-  exists gs', gs' <<= gs /\ isValid params gs' /\
+  exists gs', gs' <<= gs /\ round_no gs' = round_no gs /\ isValid params gs' /\
   (forall i j, i < n gs' -> j < n gs' -> 
     (exists m b, message_archive gs' (round_no gs') i j = Some m /\ vote m = Some b) 
-    /\ delivered gs' (round_no gs') i j = false /\ extract_historyrj j gs' (round_no gs') j = None).
+    /\ delivered gs' (round_no gs') i j = false /\ extract_historyrj j gs' (round_no gs') i = None).
 Proof.
-Admitted.
+  intros params gs H H0.
+  remember (round_no gs) as r.
+  destruct r.
+  - inversion H.
+    remember (initGS params) as gs0.
+    exists gs0.
+    split.
+    auto.
+    split.
+    rewrite Heqgs0.
+    unfold initGS.
+    auto.
+    split.
+    unfold isValid.
+    auto.
+    split.
+    auto.
+    rewrite Heqgs0.
+    eapply (reflex).
+    intros.
+    rewrite Heqgs0.
+    unfold initGS.
+    destruct params.
+    unfold initLS.
+    unfold update_messages.
+    unfold step_message.
+    simpl.
+    assert (i <? f_to_n numf0 = true).
+    eapply (Nat.ltb_lt).
+    rewrite Heqgs0 in H3.
+    unfold initGS in H3.
+    simpl in H3.
+    auto.
+    rewrite H5.
+    unfold step_message_from_to.
+    simpl.
+    split.
+    exists (MSG i j 0 (Some (inputs0 i))).
+    exists (inputs0 i).
+    auto.
+    split.
+    auto.
+    unfold extract_historyrj.
+    simpl.
+    assert (j <? f_to_n numf0 = true).
+    eapply (Nat.ltb_lt).
+    rewrite Heqgs0 in H4.
+    unfold initGS in H4.
+    simpl in H4.
+    auto.
+    rewrite H6.
+    auto.
+  - unfold isValid in H.
+    destruct H.
+    remember (initGS params) as gs0.
+    induction H1.
+    rewrite Heqgs0 in Heqr.
+    unfold initGS in Heqr.
+    simpl in Heqr.
+    inversion Heqr.
+    specialize (Core4_1_2_1 s').
+    intros.
+    destruct H2.
+    rewrite <- H2 in Heqr.
+    specialize (Core3_7 s' (step s') (succ s')).
+    intros.
+    rewrite <- H3 in H0.
+    assert (forall i, i < n s' -> exists b, extract_estimationr i s' (S r) = Some b).
+    intros.
+    specialize (H0 i H4).
+    destruct H0.
+    exists x.
+    eapply (Core4_1_2_3).
+    apply (succ s').
+    auto.
+    auto.
+    specialize (IHLow_leq Heqgs0 Heqr H4).
+    destruct IHLow_leq.
+    exists x.
+    destruct H5.
+    split.
+    apply (transit x s' (step s') H5 (succ s')).
+    auto.
+    exists (step s').
+    split.
+    eapply (reflex).
+    split.
+    auto.
+    split.
+    unfold isValid.
+    split.
+    auto.
+    rewrite <- Heqgs0.
+    apply (transit s s' (step s') H1 (succ s')).
+    intros.
+    specialize (H0 i H3).
+    remember (step s') as s''.
+    unfold step in Heqs''.
+    remember (get_undelivered (n s') (message_archive s' (round_no s')) (delivered s' (round_no s'))) as sm.
+    destruct sm.
+    rewrite Heqs'' in H2.
+    simpl in H2.
+    crush.
+    destruct H0.
+    assert (isValid params s').
+    unfold isValid.
+    split.
+    auto.
+    rewrite <- Heqgs0.
+    auto.
+    assert (round_no s' < (round_no s'')).
+    crush.
+    specialize (Core3_10_5_1_1_1 params s' (round_no s'') H5 H6 i j).
+    intros.
+    destruct H7.
+    destruct H8.
+    destruct H9.
+    rewrite Heqs''.
+    simpl.
+    unfold update_messages.
+    assert (round_no s' + 1 =? round_no s' + 1 = true).
+    eapply (beq_nat_true_iff).
+    auto.
+    rewrite H11.
+    assert (round_no s' + 1 = round_no s'').
+    crush.
+    rewrite <- H12 in H7.
+    rewrite H7.
+    split.
+    unfold step_message.
+    unfold step_round.
+    unfold extract_estimationr in H0.
+    rewrite Heqs'' in H0.
+    simpl in H0.
+    unfold step_round in H0.
+    remember (local_states s' i) as ls.
+    destruct ls.
+    unfold step_message_from_to.
+    unfold step_round_loc.
+    unfold step_round_loc in H0.
+    destruct l.
+    destruct (estimation ls (hl_round_no ls + 1)).
+    simpl in H0.
+    simpl.
+    exists (MSG i j (hl_round_no ls + 1) (estimation ls (hl_round_no ls + 1))).
+    exists x.
+    simpl.
+    split.
+    reflexivity.
+    assert (hl_round_no ls = round_no s').
+    assert (extract_round i s' = Some (hl_round_no ls)).
+    unfold extract_round.
+    rewrite <- Heqls.
+    reflexivity.
+    apply (Core3_8_1 params s' i (hl_round_no ls) H5 H13).
+    congruence.
+    simpl.
+    assert (hl_round_no ls + 1 =? hl_round_no ls + 1 = true).
+    eapply (beq_nat_true_iff).
+    crush.
+    rewrite H13.
+    simpl in H0.
+    assert (estimate (n s') (CQ s') (history ls (hl_round_no ls)) = Some x).
+    assert (hl_round_no ls = round_no s').
+    assert (extract_round i s' = Some (hl_round_no ls)).
+    unfold extract_round.
+    rewrite <- Heqls.
+    reflexivity.
+    apply (Core3_8_1 params s' i (hl_round_no ls) H5 H14).
+    rewrite <- H14 in H12.
+    rewrite <- H12 in Heqr.
+    rewrite <- Heqr in H0.
+    assert (r =? r = true).
+    eapply (beq_nat_true_iff).
+    auto.
+    rewrite H15 in H0.
+    auto.
+    rewrite H14.
+    exists (MSG i j (hl_round_no ls + 1) (Some x)).
+    exists x.
+    auto.
+    inversion H0.
+    split.
+    congruence.
+    assert (extract_historyrj j s' (round_no s'') i = None).
+    specialize (Core3_10_5_1_1_1 params s' (round_no s'') H5 H6 j i).
+    tauto.
+    unfold extract_historyrj.
+    simpl.
+    unfold step_round.
+    unfold extract_historyrj in H13.
+    destruct (local_states s' j).
+    unfold step_round_loc.
+    destruct l.
+    destruct (estimation ls (hl_round_no ls + 1)).
+    rewrite <- H12 in H13.
+    simpl.
+    auto.
+    simpl.
+    congruence.
+    auto.
+Qed.
+
+Lemma Core3_10_5_1_2_1 : forall n msg dev i m', i < n -> msg i = Some m' -> get_undelivered1d n msg dev = None -> dev i = true.
+Proof.
+  intros.
+  induction n0.
+  - inversion H.
+  - unfold get_undelivered1d in H.
+    inversion H.
+    unfold get_undelivered1d in H1.
+    rewrite H3 in H0.
+    rewrite H0 in H1.
+    destruct (dev n0).
+    auto.
+    inversion H1.
+    unfold get_undelivered1d in H1.
+    destruct (msg n0).
+    destruct (dev n0).
+    fold get_undelivered1d in H1.
+    crush.
+    inversion H1.
+    fold get_undelivered1d in H1.
+    crush.
+Qed.
+
+Lemma Core3_10_5_1_2_2 : forall n m msg dev i j m', i < n -> j < m -> msg i j = Some m' -> get_undelivered2d n m msg dev = None ->
+  dev i j = true.
+Proof.
+  intro n0.
+  induction n0 ; intros.
+  - inversion H.
+  - unfold get_undelivered2d in H2.
+    remember (get_undelivered1d m (msg n0) (dev n0)) as m1d.
+    destruct m1d.
+    inversion H2.
+    fold get_undelivered2d in H2.
+    inversion H.
+    + rewrite H4 in H1.
+      specialize (Core3_10_5_1_2_1 m (msg n0) (dev n0) j m' H0 H1 (eq_sym Heqm1d)).
+      tauto.
+    + assert (i < n0).
+      crush.
+      specialize (IHn0 m msg dev i j m' H5 H0 H1 H2).
+      auto.
+Qed.
+
+
+Lemma Core3_10_5_1_2_3 : forall gs i j m, i < n gs -> j < n gs -> message_archive gs (round_no gs) i j = Some m -> 
+  None = get_undelivered (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs)) ->
+  delivered gs (round_no gs) i j = true.
+Proof.
+  intros.
+  remember (round_no gs) as r.
+  remember (n gs) as n0.
+  remember (message_archive gs r) as h.
+  remember (delivered gs) as d.
+  clear Heqd Heqh Heqr Heqn0 gs.
+  unfold get_undelivered in H2.
+  specialize (Core3_10_5_1_2_2 n0 n0 h (d r) i j m H H0 H1 (eq_sym H2)).
+  tauto.
+Qed.
+
+Lemma Core3_10_5_1_2_4_1 : forall params gs r i j m, isValid params gs -> round_no gs = r -> extract_historyrj j gs r i = Some m -> delivered gs r i j = true.
+Proof.
+  intros.
+  specialize (Core3_10_4_1 params gs r j i m H H1).
+  intros.
+  destruct H2.
+  remember x as gs0.
+  forget x.
+  destruct H2.
+  destruct H3.
+  destruct H4.
+  assert (delivered (step gs0) r i j = true).
+  specialize (Core3_10_2_2_1 gs0 r j i m H4 H5).
+  specialize (Core3_10_2_2_2 gs0 r j i m H4 H5).
+  specialize (Core3_10_2_2 params gs0 r j i m H2 H4 H5).
+  intros.
+  destruct H6.
+  destruct H9.
+  destruct H7.
+  destruct H11.
+  unfold step.
+  rewrite H8.
+  simpl.
+  unfold update_delivered.
+  destruct m.
+  simpl in H7.
+  simpl in H11.
+  simpl in H12.
+  assert (r =? round_no gs0 = true).
+  unfold step in H9.
+  rewrite H8 in H9.
+  simpl in H9.
+  eapply (beq_nat_true_iff) ; auto.
+  assert (i =? sender_id0 = true).
+  eapply (beq_nat_true_iff) ; auto.
+  assert (j =? receiver_id0 = true).
+  eapply (beq_nat_true_iff) ; auto.
+  rewrite H13.
+  rewrite H14.
+  rewrite H15.
+  simpl.
+  auto.
+  specialize (Low_Level_Monotonicity (step gs0) gs H3).
+  intros.
+  destruct H7.
+  destruct H8.
+  destruct H9.
+  destruct H10.
+  destruct H11.
+  destruct H12.
+  apply (H13 r i j H6).
+Qed.
+
+Lemma Core3_10_5_1_2_4 : forall params gs r i j, isValid params gs -> round_no gs = r -> delivered gs r i j = false -> extract_historyrj j gs r i = None.
+Proof.
+  intros.
+  remember (extract_historyrj j gs r i) as m.
+  destruct m.
+  specialize (Core3_10_5_1_2_4_1 params gs r i j m H H0 (eq_sym Heqm)).
+  congruence.
+  auto.
+Qed.
+
+Lemma Core3_10_5_1_2_5 : forall params gs r i j m, isValid params gs -> round_no gs = r -> delivered gs r i j = false -> delivered (step gs) r i j = true -> 
+  message_archive gs r i j = Some m ->
+  get_undelivered (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs)) = Some m /\ j < (n gs) /\ j = receiver_id m /\ r = m_round_no m /\ i = sender_id m.
+Proof.
+  intros.
+  specialize (Core3_10_2_2_4 params gs r i j m H H3).
+  intros.
+  destruct H4.
+  destruct H5.
+  destruct H6.
+  remember (step gs) as gs'.
+  unfold step in Heqgs'.
+  remember (get_undelivered (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs))) as sm.
+  destruct sm.
+  - specialize (Core3_10_2_2_3 (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs)) m0 (eq_sym Heqsm)).
+    intros.
+    destruct H8.
+    remember x as i0.
+    forget x.
+    destruct H8.
+    remember x as j0.
+    forget x.
+    destruct H8.
+    specialize (Core3_10_2_2_4 params gs (round_no gs) i0 j0 m0 H H8).
+    intros.
+    destruct H10.
+    destruct H11.
+    destruct H12.
+    destruct (Nat.eq_dec i i0).
+    + destruct (Nat.eq_dec j j0).
+      split.
+      congruence.
+      destruct H9.
+      crush.
+      rewrite Heqgs' in H2.
+      simpl in H2.
+      unfold update_delivered in H2.
+      destruct m0.
+      simpl in H10.
+      simpl in H11.
+      assert ((j =? receiver_id0) = false).
+      eapply (beq_nat_false_iff) ; congruence.
+      rewrite H14 in H2.
+      simpl in H2.
+      destruct (r =? round_no gs) ; destruct (i =? sender_id0) ; simpl in H2 ; congruence.
+    + rewrite Heqgs' in H2.
+      simpl in H2.
+      unfold update_delivered in H2.
+      destruct m0.
+      simpl in H10.
+      simpl in H11.
+      assert ((i =? sender_id0) = false).
+      eapply (beq_nat_false_iff) ; congruence.
+      rewrite H14 in H2.
+      destruct (r =? round_no gs) ; simpl in H2 ; congruence.
+  - rewrite Heqgs' in H2.
+    simpl in H2.
+    congruence.
+Qed.
+
+Lemma Core3_10_5_1_2_6_1 : forall params gs i, isValid params gs -> i < (n gs) -> exists ls, local_states gs i = Some ls.
+Proof.
+  intros.
+  unfold isValid in H.
+  destruct H.
+  remember (initGS params) as gs0.
+  induction H1.
+  - unfold initGS in Heqgs0.
+    rewrite Heqgs0.
+    rewrite Heqgs0 in H0.
+    simpl.
+    simpl in H0.
+    assert (i <? f_to_n (numf params) = true).
+    eapply (Nat.ltb_lt) ; auto.
+    rewrite H1.
+    exists ((initLS i (inputs params i))).
+    auto.
+  - specialize (Core3_7 s' (step s') (succ s')).
+    intros.
+    rewrite <- H2 in H0.
+    specialize (IHLow_leq Heqgs0 H0).
+    destruct IHLow_leq.
+    unfold step.
+    destruct (get_undelivered  (n s') (message_archive s' (round_no s')) (delivered s' (round_no s'))).
+    + simpl.
+      unfold step_deliver.
+      remember (i =? receiver_id m) as isreceiver.
+      destruct isreceiver.
+      assert (i = receiver_id m).
+      apply (beq_nat_true i (receiver_id m) (eq_sym Heqisreceiver)).
+      rewrite <- H4.
+      rewrite H3.
+      exists (step_deliver_loc (n s') (CQ s') x m).
+      auto.
+      rewrite H3.
+      exists x.
+      auto.
+    + simpl.
+      unfold step_round.
+      rewrite H3.
+      exists (step_round_loc (n s') (CQ s') x).
+      auto.
+Qed.
+
+Lemma Core3_10_5_1_2_6 : forall params gs r i j m, isValid params gs -> r = round_no gs -> delivered gs r i j = false -> delivered (step gs) r i j = true -> message_archive gs r i j = Some m ->
+  extract_historyrj j (step gs) r i = Some m.
+Proof.
+  intros.
+  assert (extract_historyrj j gs r i = None).
+  eapply (Core3_10_5_1_2_4).
+  apply H.
+  auto.
+  auto.
+  specialize (Core3_10_5_1_2_5 params gs r i j m H (eq_sym H0) H1 H2 H3).
+  intros.
+  remember (step gs) as gs'.
+  unfold step in Heqgs'.
+  destruct H5.
+  rewrite H5 in Heqgs'.
+  destruct H6.
+  destruct H7.
+  destruct H8.
+  specialize (Core3_10_5_1_2_6_1 params gs j H H6).
+  intros.
+  destruct H10.
+  unfold extract_historyrj.
+  rewrite Heqgs'.
+  simpl.
+  unfold step_deliver.
+  assert (j =? receiver_id m = true).
+  eapply (beq_nat_true_iff) ; auto.
+  rewrite H11.
+  rewrite <- H7.
+  rewrite H10.
+  unfold step_deliver_loc.
+  destruct x.
+  simpl.
+  unfold extract_historyrj in H4.
+  rewrite H10 in H4.
+  rewrite H8 in H4.
+  rewrite H9 in H4.
+  rewrite H4.
+  assert (i =? sender_id m = true).
+  eapply (beq_nat_true_iff) ; auto.
+  assert (r =? m_round_no m = true).
+  eapply (beq_nat_true_iff) ; auto.
+  rewrite H12.
+  rewrite H13.
+  simpl.
+  rewrite <- H8 in H4.
+  rewrite <- H9 in H4.
+  rewrite H4.
+  auto.
+Qed.
 
 (* Hard *)
 Lemma Core3_10_5_1_2 : forall params gs, isValid params gs -> 
   (forall i j, i < n gs -> j < n gs -> 
     (exists m b, message_archive gs (round_no gs) i j = Some m /\ vote m = Some b) 
-    /\ delivered gs (round_no gs) i j = false /\ extract_historyrj j gs (round_no gs) j = None) ->
-  forall gs', gs <<= gs' -> round_no gs' + 1 = round_no (step gs') -> 
+    /\ delivered gs (round_no gs) i j = false /\ extract_historyrj j gs (round_no gs) i = None) ->
+  forall gs', gs <<= gs' -> round_no gs = round_no gs' -> round_no gs' + 1 = round_no (step gs') -> 
   forall i h, i < n gs -> extract_history i gs' = Some h -> 
   (forall j, j < n gs -> message_archive gs (round_no gs) j i = h j).
 Proof.
-Admitted.
+  intros.
+  assert (forall i j, i < n gs -> j < n gs -> delivered gs' (round_no gs') i j = true).
+  intros.
+  specialize (H0 i0 j0 H7 H8).
+  destruct H0.
+  destruct H0.
+  remember x as m.
+  forget x.
+  destruct H0.
+  remember x as b.
+  forget b.
+  destruct H0.
+  assert (message_archive gs' (round_no gs') i0 j0 = Some m).
+  specialize (Low_Level_Monotonicity gs gs' H1).
+  intros.
+  destruct H11.
+  destruct H12.
+  destruct H13.
+  destruct H14.
+  destruct H15.
+  destruct H16.
+  specialize (H16 (round_no gs) i0 j0 m H0).
+  congruence.
+  remember (step gs') as gs''.
+  unfold step in Heqgs''.
+  remember (get_undelivered (n gs') (message_archive gs' (round_no gs')) (delivered gs' (round_no gs'))) as sm.
+  destruct sm.
+  rewrite Heqgs'' in H3.
+  simpl in H3.
+  crush.
+  assert ((n gs) = (n gs')).
+  eapply Core3_7.
+  auto.
+  rewrite H12 in H7.
+  rewrite H12 in H8.
+  eapply Core3_10_5_1_2_3 ; auto.
+  apply H11.
+  specialize (H0 j i H6 H4).
+  destruct H0.
+  destruct H0.
+  destruct H0.
+  destruct H0.
+  destruct H8.
+  specialize (H7 j i H6 H4).
+  rewrite <- H2 in H7.
+  remember (fun gs0 => delivered gs0 (round_no gs) j i) as fdij.
+  assert (forall gs0, fdij gs0 = delivered gs0 (round_no gs) j i).
+  intros.
+  rewrite Heqfdij.
+  auto.
+  rewrite <- H11 in H7.
+  rewrite <- H11 in H8.
+  assert (fdij gs <> fdij gs').
+  congruence.
+  specialize (Low_Level_Witness gs gs' fdij H1 H12).
+  intros.
+  destruct H13.
+  remember x1 as gs1.
+  destruct H13.
+  destruct H14.
+  destruct H15.
+  assert (fdij (step gs1) = true).
+  destruct (fdij (step gs1)) ; crush.
+  rewrite Heqfdij in H17.
+  rewrite H8 in H15.
+  rewrite Heqfdij in H15.
+  assert (message_archive gs1 (round_no gs) j i = Some x).
+  specialize (Low_Level_Monotonicity gs gs1 H13).
+  intros.
+  destruct H18.
+  destruct H19.
+  destruct H20.
+  destruct H21.
+  destruct H22.
+  destruct H23.
+  specialize (H23 (round_no gs) j i x H0).
+  auto.
+  assert (isValid params gs1).
+  unfold isValid in H.
+  destruct H.
+  unfold isValid.
+  split.
+  auto.
+  eapply transit.
+  apply H19.
+  auto.
+  assert (round_no gs = round_no gs1).
+  assert (round_no gs <= round_no gs1).
+  specialize (Low_Level_Monotonicity gs gs1 H13).
+  unfold Low_mono.
+  tauto.
+  assert (round_no gs1 <= round_no gs').
+  specialize (Low_Level_Monotonicity gs1 gs' (transit gs1 (step gs1) gs' (succ gs1) H14)).
+  unfold Low_mono.
+  tauto.
+  crush.
+  specialize (Core3_10_5_1_2_6 params gs1 (round_no gs) j i x H19 H20 (eq_sym H15) H17 H18).
+  intros.
+  rewrite H0.
+  specialize (Core3_10_2_1 (step gs1) gs' (round_no gs) i j x H14 H21).
+  intros.
+  unfold extract_historyrj in H22.
+  unfold extract_history in H5.
+  remember (local_states gs' i) as ls.
+  destruct ls.
+  destruct l.
+  inversion H5.
+  assert (hl_round_no ls = round_no gs).
+  assert (extract_round i gs' = Some (hl_round_no ls)).
+  unfold extract_round.
+  rewrite <- Heqls.
+  reflexivity.
+  assert (isValid params gs').
+  apply (Core3_4_1 params gs gs' H H1).
+  rewrite (Core3_8_1 params gs' i (hl_round_no ls) H25 H23).
+  auto.
+  congruence.
+  inversion H22.
+Qed.
 
 Lemma Core3_10_5_1_3 : forall params n h, (forall i, i < n -> (exists m b, h i = Some m /\ vote m = Some b)) -> cond params n (filter h).
 Proof.
@@ -1758,7 +2548,8 @@ Qed.
 
 (* Hard ??? *)
 Lemma Core3_10_5_1 : forall params gs, isValid params gs -> (forall i, i < n gs -> exists b, extract_estimationr i gs (round_no gs) = Some b) ->
-  (forall gs', gs <<= gs' -> round_no gs' + 1 = round_no (step gs') -> (forall j h, j < n gs -> extract_history j gs' = Some h -> cond params (n gs) (filter h))).
+  (forall gs', gs <<= gs' -> round_no gs = round_no gs' -> round_no gs' + 1 = round_no (step gs') -> 
+  (forall j h, j < n gs -> extract_history j gs' = Some h -> cond params (n gs) (filter h))).
 Proof.
   intros params gs H H0.
   specialize (Core3_10_5_1_1 params gs H H0).
@@ -1766,19 +2557,21 @@ Proof.
   destruct H1.
   destruct H1.
   destruct H2.
+  destruct H3.
   intros.
   eapply Core3_10_5_1_3.
   intros.
   specialize (Core3_7 x gs H1).
   intros.
-  rewrite <- H9 in H6.
-  rewrite <- H9 in H8.
-  specialize (Core3_10_5_1_2 params x H2 H3 gs' (transit x gs gs' H1 H4) H5 j h H6 H7 i H8).
+  rewrite <- H11 in H8.
+  rewrite <- H11 in H10.
+  rewrite H6 in H2.
+  specialize (Core3_10_5_1_2 params x H3 H4 gs' (transit x gs gs' H1 H5) H2 H7 j h H8 H9 i H10).
   intros.
-  specialize (H3 i j H8 H6).
-  rewrite H10 in H3.
-  destruct H3.
-  apply H3.
+  specialize (H4 i j H10 H8).
+  rewrite H12 in H4.
+  destruct H4.
+  apply H4.
 Qed.
 
 Lemma Core3_10_5_2 : forall n m sqs h b i, i < m -> check_quorum_infer n (sqs i) (filter h) = Some b -> exists b', testall n m sqs h = Some b'.
@@ -1933,7 +2726,7 @@ Proof.
         auto.
         specialize (IHLow_leq Heqgs0 (round_no s') H18).
         rewrite H6 in H3.
-        specialize (Core3_10_5_1 params s' H15 IHLow_leq s' (reflex s') H16 i h H3 H17).
+        specialize (Core3_10_5_1 params s' H15 IHLow_leq s' (reflex s') (eq_refl (round_no s')) H16 i h H3 H17).
         intros.
         destruct H.
         assert (f_to_n (numf params) = n s').
@@ -2361,49 +3154,6 @@ Proof.
   congruence.
 Qed.
 
-
-
-(* Simple *)
-Lemma Core4_1_2_3 : forall gs gs' r i b, gs <<= gs' -> round_no gs = round_no gs' -> extract_estimationr i gs' r = Some b -> extract_estimationr i gs r = Some b.
-Proof.
-  intros.
-  induction H.
-  - auto.
-  - assert (round_no s = round_no s').
-    specialize (Core4_1_2_1 s').
-    intros.
-    assert (round_no s <= round_no s').
-    specialize (Low_Level_Monotonicity s s' H).
-    intros.
-    destruct H3.
-    auto.
-    destruct H2 ; crush.
-    rewrite IHLow_leq ; auto.
-    remember (step s') as s''.
-    unfold step in Heqs''.
-    destruct (get_undelivered (n s') (message_archive s' (round_no s')) (delivered s' (round_no s'))).
-    rewrite Heqs'' in H1.
-    rewrite <- H1.
-    unfold extract_estimationr.
-    unfold step_deliver.
-    simpl.
-    remember (i =? receiver_id m) as isreceiver.
-    destruct isreceiver.
-    assert (i = receiver_id m).
-    eapply (beq_nat_true).
-    auto.
-    rewrite <- H3.
-    destruct (local_states s' i).
-    destruct l.
-    unfold step_deliver_loc.
-    simpl.
-    auto.
-    auto.
-    auto.
-    rewrite Heqs'' in H0.
-    simpl in H0.
-    crush.
-Qed.
 
 (* Simple *)
 Lemma Core4_1_2_4 : forall params gs r i b, isValid params gs -> extract_estimationr i gs r = Some b -> i < (n gs).

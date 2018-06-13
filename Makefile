@@ -8,5 +8,5 @@ Makefile.coq:	Makefile _CoqProject
 
 clean::	Makefile.coq
 	$(MAKE) -f Makefile.coq clean
-	rm -f Makefile.coq
+	rm -f Makefile.coq Makefile.coq.conf
 
