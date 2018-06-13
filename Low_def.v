@@ -2,8 +2,8 @@
 
 Require Import Program Arith List CpdtTactics EquivDec.
 
-Load Quorum.
-Load Temporal.
+Require Import Quorum.
+Require Import Temporal.
 
 (* Model *)
 
