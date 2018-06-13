@@ -1,8 +1,6 @@
 (* Theorems about high level protocol *)
 
-Require Import Program Arith CpdtTactics.
-
-Load High_def.
+Require Import Program Arith CpdtTactics High_def.
 
 Definition agree' (bi : option bool) (bj : option bool) : Prop :=
   match bi, bj with
@@ -74,20 +72,20 @@ Proof.
     specialize (H0 i0 j).
     clear H H3.
     unfold Hextract.
-    remember (i0 <? hg_n1) as inrange_i0.
-    remember (j <? hg_n1) as inrange_j.
+    remember (i0 <? hg_n0) as inrange_i0.
+    remember (j <? hg_n0) as inrange_j.
     destruct (inrange_i0) ; unfold agree'; auto.
     destruct (inrange_j).
     + remember (i0 =? i) as isi_i0.
       remember (j =? i) as isi_j.
       destruct (isi_i0).
-      destruct (isi_j).
-      * remember (Hextract_loc match h_localstates1 i with
+      destruct (isi_j). 
+      * remember (Hextract_loc match h_localstates0 i with
                    | Some ls => Some (Hstep_decide_loc ls b)
                    | None => None
                    end) as hi.
         destruct hi ; auto.
-      * remember (Hextract_loc match h_localstates1 i with
+      * remember (Hextract_loc match h_localstates0 i with
                    | Some ls => Some (Hstep_decide_loc ls b)
                    | None => None
                    end) as hi.
@@ -101,10 +99,10 @@ Proof.
         rewrite <- Heqinrange_i0 in H2.
         rewrite H2.
         auto.
-    + destruct (Hextract_loc (if i0 =? i then match h_localstates1 i with
+    + destruct (Hextract_loc (if i0 =? i then match h_localstates0 i with
                                     | Some ls => Some (Hstep_decide_loc ls b)
                                     | None => None
-                                    end else h_localstates1 i0)) ; auto.
+                                    end else h_localstates0 i0)) ; auto.
   - subst.
     specialize (Hextract_agree_same_or_none gs b).
     inversion H1.
@@ -127,9 +125,9 @@ Proof.
     unfold Hextract.
     unfold Hextract in H4.
     unfold Hextract in H5.
-    intros.
-    remember hg_n0 as n.
-    remember h_localstates0 as localstates.
+    intros. 
+    remember hg_n as n. 
+    remember h_localstates as localstates.
     remember (i0 <? n) as inrange_i0.
     remember (j <? n) as inrange_j.
     destruct (inrange_i0) ; unfold agree'; auto.

@@ -1,10 +1,6 @@
 (* Refinement Theorem *)
-
-Require Import Program Arith PeanoNat List CpdtTactics.
-
-Load Assumption.
-Load Low_def.
-Load High_proof.
+Require Import Program Arith PeanoNat List CpdtTactics EquivDec.
+Require Import Assumption Quorum Low_def High_def High_proof Temporal.
 
 Definition ref_map_local (lls : option LocalState) : (option HLocalState) :=
   match lls with
@@ -42,7 +38,7 @@ Proof.
   intros.
   unfold HinitLS.
   unfold initLS.
-  destruct (x <? f_to_n numf0).
+  destruct (x <? f_to_n numf).
   auto.
   auto.
   rewrite hfeq.
@@ -98,35 +94,35 @@ Lemma finiteNone : forall (n : nat) (f : nat -> option bool) (i : nat), None = f
 Proof.
   intros.
   generalize dependent i.
-  induction n0.
+  induction n.
   - crush.
   - intros.
     inversion H0.
     + simpl in H.
-      destruct (f0 n0).
+      destruct (f n).
       auto.
       auto.
-    + apply IHn0.
+    + apply IHn.
       * simpl in H.
-        destruct (f0 n0) ; crush.
-      * destruct n0 ; crush.
+        destruct (f n) ; crush.
+      * destruct n ; crush.
 Qed.
 
 Lemma finiteSome : forall (n : nat) (f : nat -> option bool) (b : bool), Some b = fold_right mergeb None (map f (rseq n))  -> (exists i, i < n /\ f i = Some b).
 Proof.
   intros.
-  induction n0.
+  induction n.
   - crush.
   - intros.
     inversion H.
-    remember (f0 n0) as v.
+    remember (f n) as v.
     destruct v.
     + inversion H1.
       rewrite <- H2.
-      exists n0.
+      exists n.
       crush.
     + inversion H1.
-      remember (IHn0 H2) as H3.
+      remember (IHn H2) as H3.
       inversion H3.
       exists x.
       crush.
@@ -321,7 +317,8 @@ Proof.
   unfold testall in H.
   induction m.
   - inversion H.
-  - remember (testone n0 (sq0 m) h) as sq.
+  - rename sq into sq0.
+    remember (testone n (sq0 m) h) as sq.
     destruct sq.
     + exists m.
       crush.
@@ -472,23 +469,23 @@ Lemma Core3_6_1 : forall n q b, check_quorum_infer' n q b = false ->
   exists i, i < n /\ q i = true /\ b i = false.
 Proof.
   intros.
-  induction n0.
+  induction n.
   - inversion H.
   - unfold check_quorum_infer' in H.
-    remember (q n0) as qn0.
-    remember (b n0) as bn0.
+    remember (q n) as qn0.
+    remember (b n) as bn0.
     destruct qn0.
     destruct bn0.
     fold check_quorum_infer' in H.
-    specialize (IHn0 H).
-    destruct IHn0.
+    specialize (IHn H).
+    destruct IHn.
     exists x.
     crush.
-    exists n0.
+    exists n.
     auto.
     fold check_quorum_infer' in H.
-    specialize (IHn0 H).
-    destruct IHn0.
+    specialize (IHn H).
+    destruct IHn.
     exists x.
     crush.
 Qed.
@@ -496,24 +493,24 @@ Qed.
 Lemma Core3_6_2 : forall n q b i, check_quorum_infer' n q b = true -> i < n -> q i = true ->
   b i = true.
 Proof.  intros.
-  induction n0.
+  induction n.
   - inversion H0.
   - inversion H0.
     unfold check_quorum_infer' in H.
     rewrite H3 in H1.
     rewrite H1 in H.
-    remember (b n0) as bn0.
+    remember (b n) as bn0.
     destruct bn0.
     auto.
     auto.
     unfold check_quorum_infer' in H.
-    destruct (q n0).
-    destruct (b n0).
+    destruct (q n).
+    destruct (b n).
     fold check_quorum_infer' in H.
-    apply IHn0 ; auto.
+    apply IHn ; auto.
     inversion H.
     fold check_quorum_infer' in H.
-    apply IHn0 ; auto.
+    apply IHn ; auto.
 Qed.
 
 Lemma Core3_6_3 : forall n q b b0, check_quorum_infer n q b = Some b0 ->
@@ -531,17 +528,17 @@ Proof.
                          | Some false => true
                          | None => false
                          end) as bf.
-  remember (check_quorum_infer' n0 q bt) as cbt.
-  remember (check_quorum_infer' n0 q bf) as cbf.
+  remember (check_quorum_infer' n q bt) as cbt.
+  remember (check_quorum_infer' n q bf) as cbf.
   destruct cbt.
   destruct cbf.
   inversion H.
-  specialize (Core3_6_1 n0 q bf (eq_sym Heqcbf)).
+  specialize (Core3_6_1 n q bf (eq_sym Heqcbf)).
   intros.
   destruct H0.
   destruct H0.
   destruct H1.
-  specialize (Core3_6_2 n0 q bt x (eq_sym Heqcbt) H0 H1).
+  specialize (Core3_6_2 n q bt x (eq_sym Heqcbt) H0 H1).
   intros.
   assert (b x = Some true).
   rewrite Heqbt in H3.
@@ -551,12 +548,12 @@ Proof.
   exists x.
   crush.
   destruct cbf.
-  specialize (Core3_6_1 n0 q bt (eq_sym Heqcbt)).
+  specialize (Core3_6_1 n q bt (eq_sym Heqcbt)).
   intros.
   destruct H0.
   destruct H0.
   destruct H1.
-  specialize (Core3_6_2 n0 q bf x (eq_sym Heqcbf) H0 H1).
+  specialize (Core3_6_2 n q bf x (eq_sym Heqcbf) H0 H1).
   intros.
   assert (b x = Some false).
   rewrite Heqbf in H3.
@@ -572,26 +569,26 @@ Lemma Core3_6_4 : forall n q b k, check_quorum_infer' n q b = true -> k < n -> q
   b k = true.
 Proof.
   intros.
-  induction n0.
+  induction n.
   - inversion H0.
   - inversion H0.
     unfold check_quorum_infer' in H.
     rewrite H3 in H1.
     rewrite H1 in H.
-    destruct (b n0).
+    destruct (b n).
     auto.
     inversion H.
     unfold check_quorum_infer' in H.
-    destruct (q n0) ; destruct (b n0).
+    destruct (q n) ; destruct (b n).
     fold check_quorum_infer' in H.
-    apply (IHn0 H).
+    apply (IHn H).
     auto.
     inversion H.
     fold check_quorum_infer' in H.
-    apply (IHn0 H).
+    apply (IHn H).
     auto.
     fold check_quorum_infer' in H.
-    apply (IHn0 H).
+    apply (IHn H).
     auto.
 Qed.
 
@@ -610,19 +607,19 @@ Proof.
                          | Some false => true
                          | None => false
                          end) as bf.
-  remember (check_quorum_infer' n0 q bt) as cbt.
-  remember (check_quorum_infer' n0 q bf) as cbf.
+  remember (check_quorum_infer' n q bt) as cbt.
+  remember (check_quorum_infer' n q bf) as cbf.
   destruct cbt.
   destruct cbf.
   inversion H.
-  specialize (Core3_6_4 n0 q bt k (eq_sym Heqcbt) H0 H1).
+  specialize (Core3_6_4 n q bt k (eq_sym Heqcbt) H0 H1).
   intros.
   rewrite Heqbt in H2.
   destruct (b k) ; auto.
   destruct b1 ; congruence.
   inversion H2.
   destruct cbf.
-  specialize (Core3_6_4 n0 q bf k (eq_sym Heqcbf) H0 H1).
+  specialize (Core3_6_4 n q bf k (eq_sym Heqcbf) H0 H1).
   intros.
   rewrite Heqbf in H2.
   destruct (b k) ; auto.
@@ -637,13 +634,13 @@ Proof.
   intros.
   unfold testone in H.
   remember (filter h) as f.
-  specialize (Core3_6_5 n0 sq0 f b k H H0 H1).
+  specialize (Core3_6_5 n sq f b k H H0 H1).
   intros.
   rewrite Heqf in H2.
   unfold filter in H2.
   destruct (h k).
   exists m.
-  destruct m ; auto ; destruct vote0 ; auto.
+  destruct m ; auto ; destruct vote ; auto.
   inversion H2.
 Qed.
 
@@ -670,7 +667,7 @@ Proof.
     subst.
     simpl.
     simpl in H0.
-    destruct (i <? f_to_n numf0).
+    destruct (i <? f_to_n numf).
     crush.
     inversion H0.
   - remember (step s') as s''.
@@ -699,7 +696,7 @@ Proof.
       destruct l.
       destruct ls.
       simpl.
-      destruct decision0 ; crush.
+      destruct decision ; crush.
       inversion H0.
       assumption.
     + rewrite Heqs''.
@@ -988,7 +985,7 @@ Proof.
   unfold initGS.
   unfold extract_estimationr'.
   simpl.
-  destruct (i <? f_to_n numf0).
+  destruct (i <? f_to_n numf).
   unfold initLS.
   simpl.
   remember (r =? 0).
@@ -1109,10 +1106,10 @@ Proof.
     simpl in H0.
     unfold update_messages.
     unfold step_message.
-    destruct (i <? f_to_n numf0).
+    destruct (i <? f_to_n numf).
     unfold initLS in H0.
     simpl in H0.
-    exists (step_message_from_to (initLS i (inputs0 i)) i j).
+    exists (step_message_from_to (initLS i (inputs i)) i j).
     auto.
     inversion H0.
   - remember (S r) as r'.
@@ -1305,25 +1302,25 @@ Qed.
 Lemma Core3_10_2_2_3_1 : forall n msg dev m', get_undelivered1d n msg dev = Some m' -> exists i, msg i = Some m' /\ i < n.
 Proof.
   intros.
-  induction n0.
+  induction n.
   - inversion H.
   - unfold get_undelivered1d in H.
-    remember (msg n0) as m0.
+    remember (msg n) as m0.
     destruct m0.
-    + remember (dev n0) as d0.
+    + remember (dev n) as d0.
       destruct d0.
-      exists n0.
+      exists n.
       split.
       congruence.
       auto.
       fold get_undelivered1d in H.
-      specialize (IHn0 H).
-      destruct IHn0.
+      specialize (IHn H).
+      destruct IHn.
       exists x.
       crush.
     + fold get_undelivered1d in H.
-      specialize (IHn0 H).
-      destruct IHn0.
+      specialize (IHn H).
+      destruct IHn.
       exists x.
       crush.
 Qed.
@@ -1356,7 +1353,7 @@ Lemma Core3_10_2_2_3 : forall n msg dev m, get_undelivered n msg dev = Some m ->
 Proof.
   intros.
   unfold get_undelivered in H.
-  apply (Core3_10_2_2_3_2 n0 n0 msg dev m H).
+  apply (Core3_10_2_2_3_2 n n msg dev m H).
 Qed.
 
 Lemma Core3_10_2_2_4_1 : forall params gs r i j m, isValid params gs -> message_archive gs r i j = None -> message_archive (step gs) r i j = Some m ->
@@ -1409,11 +1406,11 @@ Definition EqDecOptionMSG : EqDec (option Message) eq.
   assert (EqDec Message eq).
   unfold EqDec.
   intros.
-  destruct x ; destruct y.
-  destruct (X0 sender_id0 sender_id1).
-  destruct (X0 receiver_id0 receiver_id1).
-  destruct (X0 m_round_no0 m_round_no1).
-  destruct (X1 vote0 vote1).
+  destruct x ; destruct y.  
+  destruct (X0 sender_id sender_id0).
+  destruct (X0 receiver_id receiver_id0).
+  destruct (X0 m_round_no m_round_no0).
+  destruct (X1 vote vote0).
   left.
   congruence.
   right.
@@ -1797,7 +1794,7 @@ Proof.
   rewrite H0.
   auto.
   unfold testall.
-  destruct (testone n0 (sqs m) h).
+  destruct (testone n (sqs m) h).
   exists b0.
   auto.
   fold testall.
@@ -1822,7 +1819,7 @@ Proof.
     simpl.
     unfold extract_estimationr.
     simpl.
-    assert ((i <? (f_to_n numf0)) = true).
+    assert ((i <? (f_to_n numf)) = true).
     rewrite Heqgs0 in H1.
     simpl in H1.
     eapply (Nat.ltb_lt).
@@ -1830,7 +1827,7 @@ Proof.
     rewrite H3.
     unfold initLS.
     simpl.
-    exists (inputs0 i).
+    exists (inputs i).
     auto.
   - remember (succ s') as H'.
     clear HeqH'.
@@ -1962,7 +1959,7 @@ Proof.
         destruct params.
         simpl.
         simpl in H22.
-        destruct coq_cq0.
+        destruct coq_cq.
         simpl in H22.
         simpl in H.
         simpl in H21.
@@ -2154,16 +2151,16 @@ Proof.
   unfold estimate in H.
   destruct cq.
   simpl.
-  induction coq_k0.
+  induction coq_k.
   inversion H.
   unfold testall in H.
-  remember (testone n0 (coq_csq0 coq_k0) h) as sb.
+  remember (testone n (coq_csq coq_k) h) as sb.
   destruct sb.
-  exists coq_k0.
+  exists coq_k.
   crush.
   fold testall in H.
-  specialize (IHcoq_k0 H).
-  destruct IHcoq_k0.
+  specialize (IHcoq_k H).
+  destruct IHcoq_k.
   exists x.
   crush.
 Qed.
@@ -2427,7 +2424,7 @@ Lemma Core4_1_2_5 : forall n sq h b, testone n sq h = Some b -> exists k, k < n 
 Proof.
   intros.
   unfold testone in H.
-  specialize (Core3_6_3 n0 sq0 (filter h) b H).
+  specialize (Core3_6_3 n sq (filter h) b H).
   intros.
   destruct H0.
   exists x.
@@ -2960,16 +2957,16 @@ Proof.
           clear H6 H0 H1 H2 H3 H4 H5.
           match goal with
           | [ H : ?l = ?r |- _ ] => remember l as fl ; remember r as fr
-          end.
-          assert (fl 0 sender_id0 receiver_id0 = fr 0 sender_id0 receiver_id0).
+          end. 
+          assert (fl 0 sender_id receiver_id = fr 0 sender_id receiver_id).
           rewrite H7 ; auto.
           rewrite Heqfl in H.
           rewrite Heqfr in H.
           simpl in H.
-          assert ((sender_id0 =? sender_id0) = true).
+          assert ((sender_id =? sender_id) = true).
           eapply Nat.eqb_eq.
           auto.
-          assert ((receiver_id0 =? receiver_id0) = true).
+          assert ((receiver_id =? receiver_id) = true).
           eapply Nat.eqb_eq.
           auto.
           rewrite H0 in H.
@@ -2978,7 +2975,7 @@ Proof.
           inversion H.
         }
         inversion H6.
-        destruct round_no0 ; inversion H0.
+        destruct round_no ; inversion H0.
       * rewrite <- Heqinits ; auto.
     + remember (IHLow_leq H2 Heqinits) as H'.
       unfold HisValid in H'.

@@ -2,7 +2,7 @@
 
 Require Import Program.
 
-Load Refinement.
+Require Import Refinement Temporal Low_def High_proof.
 
 Theorem Low_Level_Agreement : forall params, isValidP params -> Always (compose agree ref_map) (initGS params).
 Proof.
