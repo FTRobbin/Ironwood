@@ -1772,7 +1772,7 @@ Proof.
     crush.
     rewrite H2.
     unfold initLS.
-    remember (i <? f_to_n numf0) as inrange.
+    remember (i <? f_to_n numf) as inrange.
     destruct inrange.
     + simpl.
       rewrite H2.
@@ -1936,7 +1936,7 @@ Proof.
     unfold update_messages.
     unfold step_message.
     simpl.
-    assert (i <? f_to_n numf0 = true).
+    assert (i <? f_to_n numf = true).
     eapply (Nat.ltb_lt).
     rewrite Heqgs0 in H3.
     unfold initGS in H3.
@@ -1946,14 +1946,14 @@ Proof.
     unfold step_message_from_to.
     simpl.
     split.
-    exists (MSG i j 0 (Some (inputs0 i))).
-    exists (inputs0 i).
+    exists (MSG i j 0 (Some (inputs i))).
+    exists (inputs i).
     auto.
     split.
     auto.
     unfold extract_historyrj.
     simpl.
-    assert (j <? f_to_n numf0 = true).
+    assert (j <? f_to_n numf = true).
     eapply (Nat.ltb_lt).
     rewrite Heqgs0 in H4.
     unfold initGS in H4.
@@ -2115,19 +2115,19 @@ Qed.
 Lemma Core3_10_5_1_2_1 : forall n msg dev i m', i < n -> msg i = Some m' -> get_undelivered1d n msg dev = None -> dev i = true.
 Proof.
   intros.
-  induction n0.
+  induction n.
   - inversion H.
   - unfold get_undelivered1d in H.
     inversion H.
     unfold get_undelivered1d in H1.
     rewrite H3 in H0.
     rewrite H0 in H1.
-    destruct (dev n0).
+    destruct (dev n).
     auto.
     inversion H1.
     unfold get_undelivered1d in H1.
-    destruct (msg n0).
-    destruct (dev n0).
+    destruct (msg n).
+    destruct (dev n).
     fold get_undelivered1d in H1.
     crush.
     inversion H1.
@@ -2138,21 +2138,21 @@ Qed.
 Lemma Core3_10_5_1_2_2 : forall n m msg dev i j m', i < n -> j < m -> msg i j = Some m' -> get_undelivered2d n m msg dev = None ->
   dev i j = true.
 Proof.
-  intro n0.
-  induction n0 ; intros.
+  intro n.
+  induction n ; intros.
   - inversion H.
   - unfold get_undelivered2d in H2.
-    remember (get_undelivered1d m (msg n0) (dev n0)) as m1d.
+    remember (get_undelivered1d m (msg n) (dev n)) as m1d.
     destruct m1d.
     inversion H2.
     fold get_undelivered2d in H2.
     inversion H.
     + rewrite H4 in H1.
-      specialize (Core3_10_5_1_2_1 m (msg n0) (dev n0) j m' H0 H1 (eq_sym Heqm1d)).
+      specialize (Core3_10_5_1_2_1 m (msg n) (dev n) j m' H0 H1 (eq_sym Heqm1d)).
       tauto.
-    + assert (i < n0).
+    + assert (i < n).
       crush.
-      specialize (IHn0 m msg dev i j m' H5 H0 H1 H2).
+      specialize (IHn m msg dev i j m' H5 H0 H1 H2).
       auto.
 Qed.
 
@@ -2163,12 +2163,12 @@ Lemma Core3_10_5_1_2_3 : forall gs i j m, i < n gs -> j < n gs -> message_archiv
 Proof.
   intros.
   remember (round_no gs) as r.
-  remember (n gs) as n0.
+  remember (n gs) as n.
   remember (message_archive gs r) as h.
   remember (delivered gs) as d.
-  clear Heqd Heqh Heqr Heqn0 gs.
+  clear Heqd Heqh Heqr Heqn gs.
   unfold get_undelivered in H2.
-  specialize (Core3_10_5_1_2_2 n0 n0 h (d r) i j m H H0 H1 (eq_sym H2)).
+  specialize (Core3_10_5_1_2_2 n n h (d r) i j m H H0 H1 (eq_sym H2)).
   tauto.
 Qed.
 
@@ -2205,9 +2205,9 @@ Proof.
   rewrite H8 in H9.
   simpl in H9.
   eapply (beq_nat_true_iff) ; auto.
-  assert (i =? sender_id0 = true).
+  assert (i =? sender_id = true).
   eapply (beq_nat_true_iff) ; auto.
-  assert (j =? receiver_id0 = true).
+  assert (j =? receiver_id = true).
   eapply (beq_nat_true_iff) ; auto.
   rewrite H13.
   rewrite H14.
@@ -2275,18 +2275,18 @@ Proof.
       destruct m0.
       simpl in H10.
       simpl in H11.
-      assert ((j =? receiver_id0) = false).
+      assert ((j =? receiver_id) = false).
       eapply (beq_nat_false_iff) ; congruence.
       rewrite H14 in H2.
       simpl in H2.
-      destruct (r =? round_no gs) ; destruct (i =? sender_id0) ; simpl in H2 ; congruence.
+      destruct (r =? round_no gs) ; destruct (i =? sender_id) ; simpl in H2 ; congruence.
     + rewrite Heqgs' in H2.
       simpl in H2.
       unfold update_delivered in H2.
       destruct m0.
       simpl in H10.
       simpl in H11.
-      assert ((i =? sender_id0) = false).
+      assert ((i =? sender_id) = false).
       eapply (beq_nat_false_iff) ; congruence.
       rewrite H14 in H2.
       destruct (r =? round_no gs) ; simpl in H2 ; congruence.
