@@ -3,7 +3,7 @@
 A correct-by-construction blockchain protocol implmentation.
 
 ## How to run
-The author's version is [Coq 8.7.1](https://github.com/coq/coq/releases/tag/V8.7.1). To complie/check, run `make clean; make`.
+The author's version is [Coq 8.8.0](https://github.com/coq/coq/releases/tag/V8.8.0). To complie/check, run `make clean; make`.
 
 ## Roadmap
 * [Version 1](https://github.com/FTRobbin/Ironwood) [DONE]
