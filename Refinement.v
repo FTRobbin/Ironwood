@@ -354,11 +354,29 @@ Proof.
       crush.
 Qed.
 
+Lemma Lem_S_S' : forall gs gs', gs <<= gs' -> step gs <<= step gs'.
+Proof.
+  intros.
+  induction H.
+  constructor.
+  constructor.
+  auto.
+Qed.
+
 Lemma Lem_S'_R : forall gs, round_no gs = round_no (step gs) \/ S (round_no gs) = round_no (step gs).
 Proof.
   intros.
   unfold step.
   destruct (get_undelivered (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs)));
+  crush.
+Qed.
+
+Lemma Lem_S_R : forall gs gs', gs <<= gs' -> round_no gs <= round_no gs'.
+Proof.
+  intros.
+  induction H.
+  auto.
+  pose proof (Lem_S'_R s').
   crush.
 Qed.
 
@@ -375,7 +393,6 @@ Proof.
   simpl.
   auto.
 Qed.
-
 
 Lemma Lem_S'_Heq : forall gs r i, round_no gs < round_no (step gs) -> extract_historyr i gs r = extract_historyr i (step gs) r.
 Proof.
@@ -395,15 +412,6 @@ Proof.
   destruct (estimation ls (hl_round_no ls + 1)).
   auto.
   auto.
-  auto.
-Qed.
-
-Lemma Lem_S_S' : forall gs gs', gs <<= gs' -> step gs <<= step gs'.
-Proof.
-  intros.
-  induction H.
-  constructor.
-  constructor.
   auto.
 Qed.
 
@@ -528,8 +536,6 @@ Proof.
       reflexivity.
 Qed.
 
-
-
 Lemma Lem_S_gE0eq : forall gs gs' i, gs <<= gs' -> extract_estimationr i gs 0 = extract_estimationr i gs' 0.
 Proof.
   intros.
@@ -571,7 +577,6 @@ Proof.
       auto.
 Qed.
 
-
 Lemma Lem_S_Heq : forall gs gs' r i j m, gs <<= gs' -> extract_historyrj i gs r j = Some m -> extract_historyrj i gs' r j = Some m.
 Proof.
   intros.
@@ -600,7 +605,6 @@ Proof.
   apply (H10 r j m H0).
   inversion H0.
 Qed.
-
 
 Lemma Lem_SR_cR : forall gs gs', gs <<= gs' -> (round_no gs < round_no gs') -> exists gs'', gs <<= gs'' /\ gs'' <<= gs' /\ (S (round_no gs) = round_no gs'').
 Proof.
@@ -761,7 +765,8 @@ Proof.
 Qed.
 
 Lemma Lem_cH_M :forall gs r i j m, extract_historyrj i gs r j = None -> extract_historyrj i (step gs) r j = Some m ->
-  get_undelivered (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs)) = Some m.
+  get_undelivered (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs)) = Some m /\
+  (i = receiver_id m) /\ (r = m_round_no m) /\ (j = sender_id m).
 Proof.
   intros.
   remember (step gs) as gs'.
@@ -802,7 +807,7 @@ Proof.
     rewrite <- H2 in H.
     rewrite <- H3 in H.
     rewrite H in H0.
-    congruence.
+    crush.
     destruct (history ls (m_round_no m0) (sender_id m0)).
     congruence.
     rewrite <- Heqisround in H0.
@@ -831,55 +836,6 @@ Proof.
     simpl in H0.
     congruence.
     inversion H0.
-Qed.
-
-Lemma Lem_cH_Mp : forall gs r i j m, extract_historyrj i gs r j = None -> extract_historyrj i (step gs) r j = Some m ->
-  (i = receiver_id m) /\ (r = m_round_no m) /\ (j = sender_id m).
-Proof.
-  intros.
-  specialize (Lem_cH_M gs r i j m H H0).
-  intros.
-  remember (step gs) as gs'.
-  unfold step in Heqgs'.
-  rewrite H1 in Heqgs'.
-  rewrite Heqgs' in H0.
-  unfold extract_historyrj in H0.
-  unfold extract_historyrj.
-  simpl in H0.
-  unfold step_deliver in H0.
-  remember (i =? receiver_id m) as isreceiver.
-  destruct isreceiver.
-  assert (i = receiver_id m).
-  apply (beq_nat_true i (receiver_id m) (eq_sym Heqisreceiver)).
-  rewrite <- H2 in H0.
-  unfold extract_historyrj in H.
-  destruct (local_states gs i).
-  destruct l.
-  unfold step_deliver_loc in H0.
-  simpl in H0.
-  remember (r =? m_round_no m) as isround.
-  destruct isround.
-  assert (r = m_round_no m).
-  apply (beq_nat_true r (m_round_no m) (eq_sym Heqisround)).
-  remember (j =? sender_id m) as issender.
-  destruct issender.
-  assert (j = sender_id m).
-  apply (beq_nat_true j (sender_id m) (eq_sym Heqissender)).
-  crush.
-  destruct (history ls (m_round_no m) (sender_id m)).
-  congruence.
-  rewrite <- Heqisround in H0.
-  rewrite <- Heqissender in H0.
-  simpl in H0.
-  congruence.
-  destruct (history ls (m_round_no m) (sender_id m)).
-  congruence.
-  rewrite <- Heqisround in H0.
-  simpl in H0.
-  congruence.
-  congruence.
-  unfold extract_historyrj in H.
-  destruct (local_states gs i) ; crush.
 Qed.
 
 Lemma Lem_gH_C : forall params n h, (forall i, i < n -> (exists m b, h i = Some m /\ vote m = Some b)) -> cond params n (filter h).
@@ -1026,21 +982,6 @@ Proof.
   tauto.
 Qed.
 
-Lemma Lem_V_Qeq : forall params gs, isValid params gs -> coq_cq params = CQ gs.
-Proof.
-  intros.
-  destruct H.
-  specialize (Low_Level_Monotonicity (initGS params) gs H0).
-  intros.
-  destruct H1.
-  destruct H2.
-  destruct H3.
-  destruct H4.
-  rewrite <- H4.
-  unfold initGS.
-  auto.
-Qed.
-
 Lemma Lem_VS_V : forall params gs gs', isValid params gs -> gs <<= gs' -> isValid params gs'.
 Proof.
   intros.
@@ -1059,6 +1000,22 @@ Proof.
   apply (Lem_VS_V params gs (step gs) H (succ gs)).
 Qed.
 
+Lemma Lem_V_Qeq : forall params gs, isValid params gs -> coq_cq params = CQ gs.
+Proof.
+  intros.
+  destruct H.
+  specialize (Low_Level_Monotonicity (initGS params) gs H0).
+  intros.
+  destruct H1.
+  destruct H2.
+  destruct H3.
+  destruct H4.
+  rewrite <- H4.
+  unfold initGS.
+  auto.
+Qed.
+
+
 Lemma Lem_V_Q : forall params gs, isValid params gs -> n_CoQuorum_valid (CQ gs) (n gs) (cond params).
 Proof.
   intros.
@@ -1070,7 +1027,6 @@ Proof.
   unfold isValidP in H.
   auto.
 Qed.
-
 
 Lemma Lem_V_xT : forall params gs i, isValid params gs -> (n gs) <= i -> local_states gs i = None.
 Proof.
@@ -1110,19 +1066,6 @@ Proof.
     unfold step_round.
     rewrite IHLow_leq.
     auto.
-Qed.
-
-Lemma Lem_VlH_ip : forall params gs i r j m, isValid params gs -> extract_historyrj i gs r j = Some m -> i < (n gs).
-Proof.
-  intros.
-  remember (le_lt_dec (n gs) i).
-  destruct s.
-  - specialize (Lem_V_xT params gs i H l).
-    intros.
-    unfold extract_historyrj in H0.
-    rewrite H1 in H0.
-    inversion H0.
-  - auto.
 Qed.
 
 Lemma Lem_V_T : forall params gs i, isValid params gs -> i < (n gs) -> exists ls, local_states gs i = Some ls.
@@ -1169,17 +1112,36 @@ Proof.
       auto.
 Qed.
 
-Lemma Lem_VE_ip : forall params gs r i b, isValid params gs -> extract_estimationr i gs r = Some b -> i < (n gs).
+Lemma Lem_VT_ip : forall params gs i ls, isValid params gs -> local_states gs i = Some ls -> i < (n gs).
 Proof.
   intros.
   remember (le_lt_dec (n gs) i).
   destruct s.
-  - specialize (Lem_V_xT params gs i H l).
-    intros.
-    unfold extract_estimationr in H0.
-    rewrite H1 in H0.
-    inversion H0.
+  - pose proof (Lem_V_xT params gs i H l).
+    congruence.
   - auto.
+Qed.
+
+Lemma Lem_VH_ip : forall params gs i r j m, isValid params gs -> extract_historyrj i gs r j = Some m -> i < (n gs).
+Proof.
+  intros.
+  unfold extract_historyrj in H0.
+  remember (local_states gs i) as ls.
+  destruct ls.
+  apply (Lem_VT_ip params gs i l H).
+  auto.
+  inversion H0.
+Qed.
+
+Lemma Lem_VE_ip : forall params gs r i b, isValid params gs -> extract_estimationr i gs r = Some b -> i < (n gs).
+Proof.
+  intros.
+  unfold extract_estimationr in H0.
+  remember (local_states gs i) as ls.
+  destruct ls.
+  apply (Lem_VT_ip params gs i l H).
+  auto.
+  inversion H0.
 Qed.
 
 Lemma Lem_VlR_gR : forall params gs i r, isValid params gs -> extract_round i gs = Some r -> r = (round_no gs).
@@ -1250,44 +1212,6 @@ Proof.
       inversion H0.
 Qed.
 
-Lemma Lem_VcgM_Mp : forall params gs r i j m, isValid params gs -> message_archive gs r i j = None -> message_archive (step gs) r i j = Some m ->
-  i = sender_id m /\ j = receiver_id m /\ r = m_round_no m /\ r = round_no (step gs).
-Proof.
-  intros.
-  remember (step gs) as gs'.
-  unfold step in Heqgs'.
-  remember (get_undelivered (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs))) as sm.
-  destruct sm.
-  - rewrite Heqgs' in H1.
-    simpl in H1.
-    congruence.
-  - rewrite Heqgs' in H1.
-    simpl in H1.
-    unfold update_messages in H1.
-    unfold step_message in H1.
-    unfold step_message_from_to in H1.
-    unfold step_round in H1.
-    unfold step_round_loc in H1.
-    remember (local_states gs i) as ls.
-    destruct ls.
-    destruct l.
-    assert ((extract_round i gs) = Some (hl_round_no ls)).
-    unfold extract_round.
-    rewrite <- Heqls.
-    reflexivity.
-    specialize (Lem_VlR_gR params gs i (hl_round_no ls) H H2).
-    intros.
-    rewrite H0 in H1.
-    remember (r =? round_no gs + 1) as req.
-    destruct req.
-    assert (r = round_no gs + 1).
-    apply (beq_nat_true r (round_no gs + 1) (eq_sym Heqreq)).
-    destruct (estimation ls (hl_round_no ls + 1)) ; crush.
-    inversion H1.
-    rewrite H0 in H1.
-    destruct (r =? round_no gs + 1) ; congruence.
-Qed.
-
 Lemma Lem_VD_cD : forall params gs i b, isValid params gs -> extract_decision i gs = Some b -> 
   exists gs', isValid params gs' /\ step gs' <<= gs /\ extract_decision i gs' = None /\ extract_decision i (step gs') = Some b.
 Proof.
@@ -1356,7 +1280,45 @@ Proof.
   congruence.
 Qed.
 
-Lemma Lem_VgM_M : forall params gs r i j m, isValid params gs -> message_archive gs r i j = Some m -> i = sender_id m /\ j = receiver_id m /\ r = m_round_no m /\ r <= round_no gs.
+Lemma Lem_VcM_Mp : forall params gs r i j m, isValid params gs -> message_archive gs r i j = None -> message_archive (step gs) r i j = Some m ->
+  i = sender_id m /\ j = receiver_id m /\ r = m_round_no m /\ r = round_no (step gs).
+Proof.
+  intros.
+  remember (step gs) as gs'.
+  unfold step in Heqgs'.
+  remember (get_undelivered (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs))) as sm.
+  destruct sm.
+  - rewrite Heqgs' in H1.
+    simpl in H1.
+    congruence.
+  - rewrite Heqgs' in H1.
+    simpl in H1.
+    unfold update_messages in H1.
+    unfold step_message in H1.
+    unfold step_message_from_to in H1.
+    unfold step_round in H1.
+    unfold step_round_loc in H1.
+    remember (local_states gs i) as ls.
+    destruct ls.
+    destruct l.
+    assert ((extract_round i gs) = Some (hl_round_no ls)).
+    unfold extract_round.
+    rewrite <- Heqls.
+    reflexivity.
+    specialize (Lem_VlR_gR params gs i (hl_round_no ls) H H2).
+    intros.
+    rewrite H0 in H1.
+    remember (r =? round_no gs + 1) as req.
+    destruct req.
+    assert (r = round_no gs + 1).
+    apply (beq_nat_true r (round_no gs + 1) (eq_sym Heqreq)).
+    destruct (estimation ls (hl_round_no ls + 1)) ; crush.
+    inversion H1.
+    rewrite H0 in H1.
+    destruct (r =? round_no gs + 1) ; congruence.
+Qed.
+
+Lemma Lem_VM_Mp : forall params gs r i j m, isValid params gs -> message_archive gs r i j = Some m -> i = sender_id m /\ j = receiver_id m /\ r = m_round_no m /\ r <= round_no gs.
 Proof.
   intros.
   remember (fun r i j gs => message_archive gs r i j) as message_archive'.
@@ -1423,41 +1385,92 @@ Proof.
     unfold isValid in H.
     crush.
     destruct H10.
-    specialize (Lem_VcgM_Mp params gs1 (S r) i j m H11 (eq_sym H8) H10).
+    specialize (Lem_VcM_Mp params gs1 (S r) i j m H11 (eq_sym H8) H10).
     crush.
 Qed.
 
+Lemma Lem_VH_cH : forall params gs r i j m, isValid params gs -> extract_historyrj i gs r j = Some m ->
+  exists gs', isValid params gs' /\ (step gs') <<= gs /\ extract_historyrj i gs' r j = None /\ extract_historyrj i (step gs') r j = Some m.
+Proof.
+  intros.
+  remember (fun i r j gs => extract_historyrj i gs r j) as extract_historyrj'.
+  assert (forall i r j gs, extract_historyrj' i r j gs = extract_historyrj i gs r j).
+  crush.
+  inversion H.
+  remember (initGS params) as gs0.
+  specialize EqDecOptionMSG.
+  intros.
+  assert (extract_historyrj' i r j gs0 = None).
+  rewrite H1.
+  rewrite Heqgs0.
+  unfold extract_historyrj.
+  unfold initGS.
+  simpl.
+  destruct (i <? f_to_n (numf params)) ; crush.
+  assert (extract_historyrj' i r j gs0 <> extract_historyrj' i r j gs).
+  congruence.
+  specialize (Low_Level_Witness gs0 gs (extract_historyrj' i r j) H3 H5).
+  intros.
+  destruct H6.
+  remember x as gs1.
+  forget x.
+  destruct H6.
+  destruct H7.
+  destruct H8.
+  assert (extract_historyrj' i r j (step gs1) = Some m).
+  remember (extract_historyrj' i r j (step gs1)) as sh.
+  destruct sh.
+  specialize (Lem_S_Heq (step gs1) gs r i j m0 H7).
+  intros.
+  rewrite <- H0.
+  rewrite <- H10.
+  reflexivity.
+  congruence.
+  crush.
+  exists gs1.
+  split.
+  unfold isValid.
+  split.
+  assumption.
+  rewrite Heqgs0 in H6.
+  assumption.
+  crush.
+Qed.
 
 Lemma Lem_VcH_M : forall params gs r i j m, isValid params gs -> extract_historyrj i gs r j = None -> extract_historyrj i (step gs) r j = Some m ->
   message_archive gs r j i = Some m /\ r = (round_no (step gs)) /\ i < (n gs) /\ j < (n gs).
 Proof.
-  intros params gs r i j m H'.
   intros.
-  specialize (Lem_cH_Mp gs r i j m H H0).
-  intros.
-  destruct H1.
-  destruct H2.
-  specialize (Lem_cH_M gs r i j m H H0).
-  intros.
+  decompose record (Lem_cH_M gs r i j m H0 H1).
   remember (step gs) as gs'.
   unfold step in Heqgs'.
-  rewrite H4 in Heqgs'.
-  specialize (Lem_ud_M (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs)) m H4).
-  intros.
-  destruct H5.
+  rewrite H2 in Heqgs'.
+  pose proof (Lem_ud_M (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs)) m H2).
+  decompose record H5.
   remember x as j0.
+  remember x0 as i0.
   forget x.
-  destruct H5.
-  remember x as i0.
-  forget x.
-  destruct H5.
-  specialize (Lem_VgM_M params gs (round_no gs) j0 i0 m H' H5).
-  intros.
-  destruct H6.
-  destruct H7.
-  destruct H9.
-  destruct H10.
+  forget x0.
+  decompose record (Lem_VM_Mp params gs (round_no gs) j0 i0 m H H7).
   crush.
+Qed.
+
+Lemma Lem_VH_M : forall params gs r i j m, isValid params gs -> extract_historyrj i gs r j = Some m -> 
+  message_archive gs r j i = Some m /\ r <= (round_no gs) /\ i < (n gs) /\ j < (n gs).
+Proof.
+  intros.
+  pose proof (Lem_VH_cH params gs r i j m H H0).
+  destruct H1.
+  remember x as gs1.
+  forget x.
+  decompose record H1.
+  decompose record (Lem_VcH_M params gs1 r i j m H2 H3 H6).
+  pose proof (Low_Level_Monotonicity gs1 gs (transit gs1 (step gs1) gs (succ gs1) H4)).
+  unfold Low_mono in H9.
+  decompose record H9.
+  specialize (H16 r j i m H5).
+  crush.
+  apply (Lem_S_R (step gs1) gs H9).
 Qed.
 
 Lemma Lem_VR_xMHEL : forall params gs r, isValid params gs -> (round_no gs) < r -> 
@@ -1611,6 +1624,62 @@ Proof.
     auto.
 Qed.
 
+Lemma Lem_VE_cE : forall params gs r i eb, isValid params gs -> extract_estimationr i gs r = Some eb -> 0 < r ->
+  exists gs', isValid params gs' /\ step gs' <<= gs /\ extract_estimationr' i r gs' = None /\ extract_estimationr' i r (step gs') = Some eb.
+Proof.
+  intros.
+  destruct H.
+  remember (initGS params) as gs0.
+  rewrite (extract_estimationr_eqiv i r gs) in H0.
+  assert (extract_estimationr' i r gs0 = None).
+  rewrite Heqgs0.
+  destruct params.
+  unfold initGS.
+  unfold extract_estimationr'.
+  simpl.
+  destruct (i <? f_to_n numf).
+  unfold initLS.
+  simpl.
+  remember (r =? 0).
+  destruct b.
+  assert ((r =? 0) = true).
+  auto.
+  rewrite (beq_nat_true r 0 H3) in H1.
+  inversion H1.
+  auto.
+  auto.
+  assert (extract_estimationr' i r gs0 <> extract_estimationr' i r gs).
+  congruence.
+  assert (EqDec (option bool) eq).
+  unfold EqDec.
+  intros.
+  destruct x ; destruct y ; try destruct b ; try destruct b0 ; try (left ; reflexivity) ; try (right ; discriminate).
+  specialize (Low_Level_Witness gs0 gs (extract_estimationr' i r) H2 H4).
+  intros.
+  destruct H5.
+  remember x as gs0'.
+  forget x.
+  destruct H5.
+  destruct H6.
+  destruct H7.
+  rewrite H3 in H7.
+  rewrite H3 in H8.
+  assert (extract_estimationr' i r (step gs0') = Some eb).
+  - remember (extract_estimationr' i r (step gs0')) as eb0.
+    destruct eb0.
+    rewrite <- (extract_estimationr_eqiv i r gs) in H0.
+    rewrite <- (extract_estimationr_eqiv i r (step gs0')) in Heqeb0.
+    assert (extract_estimationr i (step gs0') r = Some b).
+    auto.
+    specialize (Lem_S_Eeq (step gs0') gs r i b H6 H9).
+    intros.
+    congruence.
+    crush.
+  - exists gs0'.
+    unfold isValid.
+    crush.
+Qed.
+
 Lemma Lem_VcE_M : forall params gs r i j eb, isValid params gs -> extract_estimationr' i r gs = None -> extract_estimationr' i r (step gs) = Some eb ->
   j < (n (step gs)) -> exists m, message_archive (step gs) r i j = Some m /\ vote m = Some eb.
 Proof.
@@ -1731,63 +1800,6 @@ Proof.
   assumption.
 Qed.
 
-Lemma Lem_VE_cE : forall params gs r i eb, isValid params gs -> extract_estimationr i gs r = Some eb -> 0 < r ->
-  exists gs', isValid params gs' /\ step gs' <<= gs /\ extract_estimationr' i r gs' = None /\ extract_estimationr' i r (step gs') = Some eb.
-Proof.
-  intros.
-  destruct H.
-  remember (initGS params) as gs0.
-  rewrite (extract_estimationr_eqiv i r gs) in H0.
-  assert (extract_estimationr' i r gs0 = None).
-  rewrite Heqgs0.
-  destruct params.
-  unfold initGS.
-  unfold extract_estimationr'.
-  simpl.
-  destruct (i <? f_to_n numf).
-  unfold initLS.
-  simpl.
-  remember (r =? 0).
-  destruct b.
-  assert ((r =? 0) = true).
-  auto.
-  rewrite (beq_nat_true r 0 H3) in H1.
-  inversion H1.
-  auto.
-  auto.
-  assert (extract_estimationr' i r gs0 <> extract_estimationr' i r gs).
-  congruence.
-  assert (EqDec (option bool) eq).
-  unfold EqDec.
-  intros.
-  destruct x ; destruct y ; try destruct b ; try destruct b0 ; try (left ; reflexivity) ; try (right ; discriminate).
-  specialize (Low_Level_Witness gs0 gs (extract_estimationr' i r) H2 H4).
-  intros.
-  destruct H5.
-  remember x as gs0'.
-  forget x.
-  destruct H5.
-  destruct H6.
-  destruct H7.
-  rewrite H3 in H7.
-  rewrite H3 in H8.
-  assert (extract_estimationr' i r (step gs0') = Some eb).
-  - remember (extract_estimationr' i r (step gs0')) as eb0.
-    destruct eb0.
-    rewrite <- (extract_estimationr_eqiv i r gs) in H0.
-    rewrite <- (extract_estimationr_eqiv i r (step gs0')) in Heqeb0.
-    assert (extract_estimationr i (step gs0') r = Some b).
-    auto.
-    specialize (Lem_S_Eeq (step gs0') gs r i b H6 H9).
-    intros.
-    congruence.
-    crush.
-  - exists gs0'.
-    unfold isValid.
-    crush.
-Qed.
-
-
 Lemma Lem_VE_M : forall params gs r i eb, isValid params gs -> extract_estimationr i gs r = Some eb ->
   forall j, j < (n gs) -> exists m, message_archive gs r i j = Some m /\ vote m = Some eb.
 Proof.
@@ -1848,124 +1860,19 @@ Proof.
       split ; assumption.
 Qed.
 
-
-Lemma Lem_VH_cH : forall params gs r i j m, isValid params gs -> extract_historyrj i gs r j = Some m ->
-  exists gs', isValid params gs' /\ (step gs') <<= gs /\ extract_historyrj i gs' r j = None /\ extract_historyrj i (step gs') r j = Some m.
-Proof.
-  intros.
-  remember (fun i r j gs => extract_historyrj i gs r j) as extract_historyrj'.
-  assert (forall i r j gs, extract_historyrj' i r j gs = extract_historyrj i gs r j).
-  crush.
-  inversion H.
-  remember (initGS params) as gs0.
-  specialize EqDecOptionMSG.
-  intros.
-  assert (extract_historyrj' i r j gs0 = None).
-  rewrite H1.
-  rewrite Heqgs0.
-  unfold extract_historyrj.
-  unfold initGS.
-  simpl.
-  destruct (i <? f_to_n (numf params)) ; crush.
-  assert (extract_historyrj' i r j gs0 <> extract_historyrj' i r j gs).
-  congruence.
-  specialize (Low_Level_Witness gs0 gs (extract_historyrj' i r j) H3 H5).
-  intros.
-  destruct H6.
-  remember x as gs1.
-  forget x.
-  destruct H6.
-  destruct H7.
-  destruct H8.
-  assert (extract_historyrj' i r j (step gs1) = Some m).
-  remember (extract_historyrj' i r j (step gs1)) as sh.
-  destruct sh.
-  specialize (Lem_S_Heq (step gs1) gs r i j m0 H7).
-  intros.
-  rewrite <- H0.
-  rewrite <- H10.
-  reflexivity.
-  congruence.
-  crush.
-  exists gs1.
-  split.
-  unfold isValid.
-  split.
-  assumption.
-  rewrite Heqgs0 in H6.
-  assumption.
-  crush.
-Qed.
-
-
-Lemma Lem_VHM_Meq : forall params gs r i j m m', isValid params gs -> extract_historyrj i gs r j = Some m -> message_archive gs r j i = Some m' ->
-  m = m'.
-Proof.
-  intros.
-  specialize (Lem_VH_cH params gs r i j m H H0).
-  intros.
-  destruct H2.
-  remember x as gs1.
-  forget x.
-  destruct H2.
-  destruct H3.
-  destruct H4.
-  specialize (Lem_VcH_M params gs1 r i j m H2 H4 H5).
-  intros.
-  destruct H6.
-  specialize (Low_Level_Monotonicity gs1 gs (transit gs1 (step gs1) gs (succ gs1) H3)).
-  intros.
-  destruct H8.
-  destruct H9.
-  destruct H10.
-  destruct H11.
-  destruct H12.
-  destruct H13.
-  specialize (H13 r j i m H6).
-  congruence.
-Qed.
-
-Lemma Lem_VEH_Heq : forall params gs r i j m eb, isValid params gs -> extract_estimationr i gs r = Some eb -> extract_historyrj j gs r i = Some m ->
+Lemma Lem_VEH_M : forall params gs r i j m eb, isValid params gs -> extract_estimationr i gs r = Some eb -> extract_historyrj j gs r i = Some m ->
   vote m = Some eb.
 Proof.
   intros.
-  specialize (Lem_VlH_ip params gs j r i m H H1).
-  intros.
-  specialize (Lem_VE_M params gs r i eb H H0 j H2).
-  intros.
+  pose proof (Lem_VH_ip params gs j r i m H H1).
+  pose proof (Lem_VE_M params gs r i eb H H0 j H2).
   destruct H3.
   destruct H3.
-  specialize (Lem_VHM_Meq params gs r j i m x H H1 H3).
-  intros.
+  decompose record (Lem_VH_M params gs r j i m H H1).
   congruence.
 Qed.
 
-Lemma Lem_VH_Hp : forall params gs r i j m, isValid params gs -> extract_historyrj i gs r j = Some m -> r <= (round_no gs) /\ j < n gs.
-Proof.
-  intros.
-  specialize (Lem_VH_cH params gs r i j m H H0).
-  intros.
-  destruct H1.
-  remember x as gs1.
-  forget x.
-  destruct H1.
-  destruct H2.
-  destruct H3.
-  specialize (Lem_VcH_M params gs1 r i j m H1 H3 H4).
-  intros.
-  destruct H5.
-  destruct H6.
-  destruct H7.
-  specialize (Low_Level_Monotonicity (step gs1) gs H2).
-  intros.
-  destruct H9.
-  destruct H10.
-  specialize (Lem_S_neq gs1 (step gs1) (succ gs1)).
-  intros.
-  crush.
-Qed.
-
-Lemma Lem_VgES_gM : forall params gs, isValid params gs -> (forall i, i < n gs -> exists b, extract_estimationr i gs (round_no gs) = Some b) ->
+Lemma Lem_VES_M : forall params gs, isValid params gs -> (forall i, i < n gs -> exists b, extract_estimationr i gs (round_no gs) = Some b) ->
   exists gs', gs' <<= gs /\ round_no gs' = round_no gs /\ isValid params gs' /\
   (forall i j, i < n gs' -> j < n gs' -> 
     (exists m b, message_archive gs' (round_no gs') i j = Some m /\ vote m = Some b) 
@@ -2186,45 +2093,34 @@ Proof.
   destruct H3.
   destruct H4.
   assert (delivered (step gs0) r i j = true).
-  specialize (Lem_cH_M gs0 r j i m H4 H5).
-  specialize (Lem_cH_Mp gs0 r j i m H4 H5).
-  specialize (Lem_VcH_M params gs0 r j i m H2 H4 H5).
-  intros.
-  destruct H6.
-  destruct H9.
-  destruct H7.
-  destruct H11.
+  decompose record (Lem_cH_M gs0 r j i m H4 H5).
+  decompose record (Lem_VcH_M params gs0 r j i m H2 H4 H5).
   unfold step.
-  rewrite H8.
+  rewrite H6.
   simpl.
   unfold update_delivered.
   destruct m.
   simpl in H7.
-  simpl in H11.
-  simpl in H12.
+  simpl in H8.
+  simpl in H10.
   assert (r =? round_no gs0 = true).
-  unfold step in H9.
-  rewrite H8 in H9.
-  simpl in H9.
+  unfold step in H12.
+  rewrite H6 in H12.
+  simpl in H12.
   eapply (beq_nat_true_iff) ; auto.
   assert (i =? sender_id = true).
   eapply (beq_nat_true_iff) ; auto.
   assert (j =? receiver_id = true).
   eapply (beq_nat_true_iff) ; auto.
   rewrite H13.
-  rewrite H14.
   rewrite H15.
+  rewrite H16.
   simpl.
   auto.
-  specialize (Low_Level_Monotonicity (step gs0) gs H3).
-  intros.
-  destruct H7.
-  destruct H8.
-  destruct H9.
-  destruct H10.
-  destruct H11.
-  destruct H12.
-  apply (H13 r i j H6).
+  pose proof (Low_Level_Monotonicity (step gs0) gs H3).
+  unfold Low_mono in H7.
+  decompose record H7.
+  apply (H15 r i j H6).
 Qed.
 
 Lemma Lem_VRL_H : forall params gs r i j, isValid params gs -> round_no gs = r -> delivered gs r i j = false -> extract_historyrj j gs r i = None.
@@ -2237,12 +2133,12 @@ Proof.
   auto.
 Qed.
 
-Lemma Lem_VRLcM_Mp : forall params gs r i j m, isValid params gs -> round_no gs = r -> delivered gs r i j = false -> delivered (step gs) r i j = true -> 
+Lemma Lem_VRcLM_Mp : forall params gs r i j m, isValid params gs -> round_no gs = r -> delivered gs r i j = false -> delivered (step gs) r i j = true -> 
   message_archive gs r i j = Some m ->
   get_undelivered (n gs) (message_archive gs (round_no gs)) (delivered gs (round_no gs)) = Some m /\ j < (n gs) /\ j = receiver_id m /\ r = m_round_no m /\ i = sender_id m.
 Proof.
   intros.
-  specialize (Lem_VgM_M params gs r i j m H H3).
+  specialize (Lem_VM_Mp params gs r i j m H H3).
   intros.
   destruct H4.
   destruct H5.
@@ -2260,7 +2156,7 @@ Proof.
     remember x as j0.
     forget x.
     destruct H8.
-    specialize (Lem_VgM_M params gs (round_no gs) i0 j0 m0 H H8).
+    specialize (Lem_VM_Mp params gs (round_no gs) i0 j0 m0 H H8).
     intros.
     destruct H10.
     destruct H11.
@@ -2306,7 +2202,7 @@ Proof.
   apply H.
   auto.
   auto.
-  specialize (Lem_VRLcM_Mp params gs r i j m H (eq_sym H0) H1 H2 H3).
+  specialize (Lem_VRcLM_Mp params gs r i j m H (eq_sym H0) H1 H2 H3).
   intros.
   remember (step gs) as gs'.
   unfold step in Heqgs'.
@@ -2481,7 +2377,7 @@ Lemma Lem_VESRcH_C : forall params gs, isValid params gs -> (forall i, i < n gs 
   (forall j h, j < n gs -> extract_history j gs' = Some h -> cond params (n gs) (filter h))).
 Proof.
   intros params gs H H0.
-  specialize (Lem_VgES_gM params gs H H0).
+  specialize (Lem_VES_M params gs H H0).
   intro.
   destruct H1.
   destruct H1.
@@ -2503,7 +2399,6 @@ Proof.
   apply H4.
 Qed.
 
-(* VR-E *)
 Lemma Lem_VR_E : forall params gs r i, isValid params gs -> r <= round_no gs -> i < n gs -> exists b, extract_estimationr i gs r = Some b.
 Proof.
   intros.
@@ -2716,15 +2611,10 @@ Lemma Lem_VH_Heq : forall params gs r i j k mj mk, isValid params gs -> extract_
   vote mj = vote mk.
 Proof.
   intros.
-  specialize (Lem_VH_Hp params gs r j i mj H H0).
-  intros.
-  destruct H2.
-  specialize (Lem_VR_E params gs r i H H2 H3).
-  intros.
-  destruct H4.
-  specialize (Lem_VEH_Heq params gs r i j mj x H H4 H0).
-  specialize (Lem_VEH_Heq params gs r i k mk x H H4 H1).
-  intros.
+  decompose record (Lem_VH_M params gs r j i mj H H0).
+  decompose record (Lem_VR_E params gs r i H H4 H6).
+  pose proof (Lem_VEH_M params gs r i j mj x H H5 H0).
+  pose proof (Lem_VEH_M params gs r i k mk x H H5 H1).
   congruence.
 Qed.
 
@@ -3112,7 +3002,7 @@ Proof.
     destruct l.
     congruence.
     inversion H6.
-    specialize (Lem_VEH_Heq params s' (round_no s') k j m b0 H5 H14 H19).
+    specialize (Lem_VEH_M params s' (round_no s') k j m b0 H5 H14 H19).
     congruence.
 Qed.
 
@@ -3173,7 +3063,7 @@ Proof.
   intros.
   specialize (Lem_VS_Heq params (step gs) (step gs) i h k m (Lem_VS'_V params gs H) (reflex (step gs)) H3 H8).
   intros.
-  specialize (Lem_VEH_Heq params (step gs) (round_no (step gs)) k i m b0 (Lem_VS'_V params gs H) H13 H14).
+  specialize (Lem_VEH_M params (step gs) (round_no (step gs)) k i m b0 (Lem_VS'_V params gs H) H13 H14).
   intros.
   congruence.
 Qed.
