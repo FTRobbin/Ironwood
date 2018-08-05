@@ -121,7 +121,7 @@ Defined.
    Q  = Quorum
    I  = Initial
    _  = Arrow
-   ?c = exact step ? changed
+   c? = exact step ? changed
    l? = local ?
    g? = global ?
    ?p = ?'s properties
@@ -378,6 +378,37 @@ Proof.
   auto.
   pose proof (Lem_S'_R s').
   crush.
+Qed.
+
+Lemma Lem_S_S : forall gs gs' gs'', gs <<= gs' -> gs <<= gs'' -> gs' <<= gs'' \/ gs'' <<= gs'.
+Proof.
+  intros.
+  generalize dependent gs''.
+  induction H.
+  - intros.
+    left ; auto.
+  - intros.
+    specialize (IHLow_leq gs'' H0).
+    destruct IHLow_leq.
+    + inversion H1.
+      right.
+      constructor.
+      constructor.
+      left.
+      apply (Lem_S_S' s' s'0 H2).
+    + right.
+      constructor.
+      auto.
+Qed.
+
+Lemma Lem_Rlt_S : forall gs gs' gs'', gs <<= gs' -> gs <<= gs'' -> (round_no gs' < round_no gs'') -> gs' <<= gs''.
+Proof.
+  intros.
+  pose proof (Lem_S_S gs gs' gs'' H H0).
+  destruct H2.
+  - auto.
+  - pose proof (Lem_S_R gs'' gs' H2).
+    crush.
 Qed.
 
 Lemma Lem_S'_M : forall gs ls i j eb, step_round (n gs) (CQ gs) (local_states gs) i = Some (Honest ls) -> estimation ls (hl_round_no ls) = Some eb ->
@@ -742,6 +773,18 @@ Proof.
     inversion Heqgs'.
     simpl in H2.
     crush.
+Qed.
+
+Lemma Lem_cD_Q : forall gs i b, extract_decision i gs = None -> extract_decision i (step gs) = Some b ->
+  exists h, extract_history i (step gs) = Some h
+  /\ exists qi, qi < coq_m (CQ (step gs)) /\ testone (n (step gs)) (coq_sq (CQ (step gs)) qi) h = Some b.
+Proof.
+  intros.
+  destruct (Lem_D_H (step gs) i b H0) as [h].
+  exists h.
+  split.
+  auto.
+  eapply (Lem_cDH_Q gs i b h) ; auto.
 Qed.
 
 Lemma Lem_E_Q : forall n cq h b, estimate n cq h = Some b -> exists qi, qi < coq_k cq /\ testone n (coq_csq cq qi) h = Some b.
@@ -2923,6 +2966,17 @@ Proof.
   congruence.
 Qed.
 
+Lemma Lem_VcDSR_E : forall params gs i b, isValid params gs -> extract_decision i gs = None -> extract_decision i (step gs) = Some b -> 
+  (forall gs', gs <<= gs' -> (S (round_no gs) = round_no gs')
+  -> forall j, j < n gs' -> extract_estimationr j gs' (round_no gs') = Some b).
+Proof.
+  intros.
+  pose proof (Lem_VR_E params gs' (round_no gs') j (Lem_VS_V params gs gs' H H2) (le_n (round_no gs')) H4).
+  destruct H5 as [b0].
+  pose proof (Lem_VcDSR_Eeq params gs i b H H0 H1 gs' H2 H3 j b0 H5).
+  congruence.
+Qed.
+
 Lemma Lem_VES_Eeq : forall params gs b, isValid params gs -> (forall i b0, extract_estimationr i gs (round_no gs) = Some b0 -> b = b0) ->
   (forall gs', gs <<= gs' -> (forall j b', extract_estimationr j gs' (round_no gs') = Some b' -> b = b')).
 Proof.
@@ -3006,7 +3060,22 @@ Proof.
     congruence.
 Qed.
 
-Lemma Lem_VcDSE_Eeq : forall params gs i b, isValid params gs -> extract_decision i gs = None -> extract_decision i (step gs) = Some b -> 
+Lemma Lem_VES_E : forall params gs b, isValid params gs -> (forall i, i < n gs -> extract_estimationr i gs (round_no gs) = Some b) ->
+  (forall gs' j, gs <<= gs' -> j < n gs' -> extract_estimationr j gs' (round_no gs') = Some b).
+Proof.
+  intros.
+  pose proof (Lem_VR_E params gs' (round_no gs') j (Lem_VS_V params gs gs' H H1) (le_n (round_no gs')) H2).
+  destruct H3 as [b0].
+  enough ((forall (i : nat) (b0 : bool), extract_estimationr i gs (round_no gs) = Some b0 -> b = b0)).
+  - pose proof (Lem_VES_Eeq params gs b H H4 gs' H1 j b0 H3).
+    congruence.
+  - intros.
+    pose proof (Lem_VE_ip params gs (round_no gs) i b1 H H4).
+    specialize (H0 i H5).
+    congruence.
+Qed.
+
+Lemma Lem_VcD_Eeq : forall params gs i b, isValid params gs -> extract_decision i gs = None -> extract_decision i (step gs) = Some b -> 
   (forall gs', gs <<= gs' -> (round_no gs < round_no gs') -> (forall j b0, extract_estimationr j gs' (round_no gs') = Some b0 ->
   b = b0)).
 Proof.
@@ -3023,8 +3092,25 @@ Proof.
   apply (Lem_VES_Eeq params gs'' b (Lem_VS_V params gs gs'' H H5) H8 gs' H6 j b0 H4).
 Qed.
 
+Lemma Lem_VcD_E : forall params gs i b, isValid params gs -> extract_decision i gs = None -> extract_decision i (step gs) = Some b -> 
+  (forall gs', gs <<= gs' -> (round_no gs < round_no gs') -> forall j, j < n gs' -> extract_estimationr j gs' (round_no gs') = Some b).
+Proof.
+  intros.
+  inversion H3.
+  - pose proof (Lem_VcDSR_E params gs i b H H0 H1 gs' H2 H6 j H4).
+    rewrite H6.
+    auto.
+  - assert (round_no gs < round_no gs').
+    auto.
+    pose proof (Lem_SR_cR gs gs' H2 H7).
+    destruct H8 as [gs''].
+    decompose record H8.
+    pose proof (Lem_VcDSR_E params gs i b H H0 H1 gs'' H9 H12).
+    pose proof (Lem_VES_E params gs'' b (Lem_VS_V params gs gs'' H H9) H10 gs' j H11 H4).
+    congruence.
+Qed.
 
-Lemma Lem_VcDi_Eeq : forall params gs i b b0, isValid params gs -> extract_decision i gs = None -> extract_decision i (step gs) = Some b -> 
+Lemma Lem_VcDE_DEeq : forall params gs i b b0, isValid params gs -> extract_decision i gs = None -> extract_decision i (step gs) = Some b -> 
   (forall j, j < (n gs) -> extract_estimationr j gs (round_no gs) = Some b0) -> b = b0.
 Proof.
   intros.
@@ -3068,7 +3154,7 @@ Proof.
   congruence.
 Qed.
 
-Theorem Lem_VcD_Eeq : forall params gs gs' i j b b0, isValid params gs -> gs' = step gs ->
+Theorem Lem_VcD_Deq : forall params gs gs' i j b b0, isValid params gs -> gs' = step gs ->
   extract_decision i gs = None -> extract_decision j gs = Some b0 -> extract_decision i gs' = Some b ->
   b = b0.
 Proof.
@@ -3181,7 +3267,7 @@ Proof.
     induction m ; crush.
     clear m H9 H11 H10.
     forget gs'.
-    specialize (Lem_VcDSE_Eeq params gs0 j b0 H4 H6 H7 gs H8 H12).
+    specialize (Lem_VcD_Eeq params gs0 j b0 H4 H6 H7 gs H8 H12).
     intros.
     assert (forall j, j < (n gs) -> extract_estimationr j gs (round_no gs) = Some b0).
     + intros.
@@ -3195,7 +3281,7 @@ Proof.
       rewrite (H0 j0 x H13).
       auto.
     + clear H0.
-      apply (Lem_VcDi_Eeq params gs i b b0 H H1 H3 H9).
+      apply (Lem_VcDE_DEeq params gs i b b0 H H1 H3 H9).
 Qed.
 
 (* Refinement *)
@@ -3423,7 +3509,7 @@ Proof.
                   unfold Hextract_loc in H2.
                   unfold ref_map_local in H2.
                   clear H1 H3 H0 HeqHgs Hjexist.
-                  eapply (Lem_VcD_Eeq params gs gs' i j b b0 H Heqgs') ; unfold extract_decision ; auto.
+                  eapply (Lem_VcD_Deq params gs gs' i j b b0 H Heqgs') ; unfold extract_decision ; auto.
                   rewrite <- Heqlsi ; rewrite Heqdi ; auto.
                   rewrite <- Heqlsj ; rewrite H2 ; auto.
                   rewrite <- Heqlsi' ; rewrite Heqdi' ; auto.
