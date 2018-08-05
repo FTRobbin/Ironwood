@@ -40,7 +40,7 @@ The author's version is [Coq 8.8.0](https://github.com/coq/coq/releases/tag/V8.8
 | Refinement.v | Refinement theorem (and all the lemmas)|
 | Temporal.v | (A not so successful atempt) to adopt temporal logic |
 
-The core theorem is `Refinement` in `Refinement.v` or you can try read the pretty proof 'Readable_Low_Level_Agreement` in `Low_proof.v` which comes with comments that serves as a pen-and-paper proof.
+The core theorem is `Refinement` in `Refinement.v` or you can try read the pretty proof `Readable_Low_Level_Agreement` in `Low_proof.v` which comes with comments that serves as a pen-and-paper proof.
 
 ## Lemma naming
 
