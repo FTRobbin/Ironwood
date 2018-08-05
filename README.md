@@ -9,12 +9,12 @@ The author's version is [Coq 8.8.0](https://github.com/coq/coq/releases/tag/V8.8
 * Version 2.0 [In progress]
   * Add Byzantine adversaries
 
-* [Version 1.1](https://github.com/FTRobbin/Ironwood/releases/tag/V1.1) [DONE]
+* [Version 1.1](https://github.com/FTRobbin/Ironwood/releases/tag/v1.1) [DONE]
   * Sensible names for lemmas
   * Improved proof structure and implementation
   * Human-readable high-level proof
 
-* [Version 1.0](https://github.com/FTRobbin/Ironwood/releases/tag/V1.0) [DONE]
+* [Version 1.0](https://github.com/FTRobbin/Ironwood/releases/tag/v1.0) [DONE]
   * Synchornous network
   * No adversaries
   * Concensus on a boolean value
